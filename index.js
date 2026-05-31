@@ -22,7 +22,11 @@ const client = new Client({
 
 client.on('qr', (qr) => {
     qrcode.generate(qr, { small: true });
-    console.log('🤖 ESCANEA EL CÓDIGO QR PARA INICIAR TU SUPER BOT 🤖');
+    // Esto genera un link en tus logs de Railway
+    console.log('====================================');
+    console.log('🔗 SACA EL QR DESDE ESTE ENLACE:');
+    console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
+    console.log('====================================');
 });
 
 client.on('ready', () => {
