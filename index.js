@@ -41,7 +41,7 @@ client.on('group_join', async (notification) => {
     });
 });
 
-client.on('message', async (msg) => {
+client.on('message_create', async msg => {
     const chat = await msg.getChat();
     const body = msg.body.trim();
     
