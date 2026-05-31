@@ -12,7 +12,7 @@ const qrcode = require('qrcode-terminal');
 
 const startTime = new Date();
 
-const const client = new Client({
+const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
         headless: true,
