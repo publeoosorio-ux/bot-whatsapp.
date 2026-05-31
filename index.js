@@ -7,6 +7,7 @@ http.createServer((req, res) => {
 }).listen(port, () => {
     console.log(`🌍 Servidor de mantener vivo corriendo en puerto ${port}`);
 });
+
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
@@ -32,7 +33,6 @@ const client = new Client({
 
 client.on('qr', (qr) => {
     qrcode.generate(qr, { small: true });
-    // Esto genera un link en tus logs de Railway
     console.log('====================================');
     console.log('🔗 SACA EL QR DESDE ESTE ENLACE:');
     console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
@@ -44,42 +44,55 @@ client.on('ready', () => {
 });
 
 client.on('group_join', async (notification) => {
-    const chat = await notification.getChat();
-    const contact = await client.getContactById(notification.recipientIds[0]);
-    await chat.sendMessage(`✨ ¡Bienvenido/a @${contact.id.user} al grupo! ✨\nDisfruta tu estadía. Usa *.bot menú* para ver mis comandos.`, {
-        mentions: [contact]
-    });
+    try {
+        const chat = await notification.getChat();
+        const contact = await client.getContactById(notification.recipientIds[0]);
+        await chat.sendMessage(`✨ ¡Bienvenido/a @${contact.id.user} al grupo! ✨\nDisfruta tu estadía. Usa *.bot menú* para ver mis comandos.`, {
+            mentions: [contact]
+        });
+    } catch (e) {
+        console.log('Error en bienvenida:', e);
+    }
 });
 
 client.on('message_create', async msg => {
-    const chat = await msg.getChat();
-    const body = msg.body.trim();
-    
-    if (!body.startsWith('.') && !body.toLowerCase().startsWith('aviso')) return;
+    try {
+        if (!msg.body) return;
+        const body = msg.body.trim();
+        
+        // Permite usar comandos tanto con punto (.) como escribiendo "aviso" directamente
+        if (!body.startsWith('.') && !body.toLowerCase().startsWith('aviso')) return;
 
-    const args = body.slice(1).trim().split(/ +/);
-    const command = args.shift().toLowerCase();
+        const args = body.slice(1).trim().split(/ +/);
+        let command = args.shift().toLowerCase();
 
-    const sender = await msg.getContact();
-    const username = sender.pushname || 'Usuario';
-    
-    let isAdmin = false;
-    if (chat.isGroup) {
-        const participant = chat.participants.find(p => p.id._serialized === sender.id._serialized);
-        if (participant && (participant.isAdmin || participant.isSuperAdmin)) {
-            isAdmin = true;
+        // Corrección importante: Si el usuario escribe ".menu" a secas, lo redirige al comando correcto automaticamente
+        if (body === '.menu') {
+            command = 'bot';
+            args[0] = 'menú';
         }
-    }
 
-    switch (command) {
-        case 'bot':
-            if (args[0]?.toLowerCase() === 'menú' || args[0]?.toLowerCase() === 'menu') {
-                const uptimeDiff = Math.abs(new Date() - startTime);
-                const hours = Math.floor(uptimeDiff / (1000 * 60 * 60));
-                const minutes = Math.floor((uptimeDiff % (1000 * 60 * 60)) / (1000 * 60));
-                const seconds = Math.floor((uptimeDiff % (1000 * 60)) / 1000);
+        const chat = await msg.getChat();
+        const sender = await msg.getContact();
+        const username = sender.pushname || 'Usuario';
+        
+        let isAdmin = false;
+        if (chat.isGroup) {
+            const participant = chat.participants.find(p => p.id._serialized === sender.id._serialized);
+            if (participant && (participant.isAdmin || participant.isSuperAdmin)) {
+                isAdmin = true;
+            }
+        }
 
-                const menuTexto = `🌐 *\`Menú Principal\`*
+        switch (command) {
+            case 'bot':
+                if (args[0]?.toLowerCase() === 'menú' || args[0]?.toLowerCase() === 'menu') {
+                    const uptimeDiff = Math.abs(new Date() - startTime);
+                    const hours = Math.floor(uptimeDiff / (1000 * 60 * 60));
+                    const minutes = Math.floor((uptimeDiff % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((uptimeDiff % (1000 * 60)) / 1000);
+
+                    const menuTexto = `🌐 *\`Menú Principal\`*
 ────────────────────────────
 👤 Usuario: ${username.toUpperCase()}
 🔰 Rol: Novato \`\`\`V\`\`\` ⚔️
@@ -133,116 +146,120 @@ client.on('message_create', async msg => {
 ⚒ *\`Owner\`*
 ╰➤ .addowner | .banchat | .block | .restart | .update`;
 
-                await chat.sendMessage(menuTexto);
-            }
-            break;
+                    // msg.reply funciona mejor que chat.sendMessage en chats propios
+                    await msg.reply(menuTexto);
+                }
+                break;
 
-        case 'todos':
-            if (!chat.isGroup) return msg.reply('❌ Este comando solo funciona en grupos.');
-            if (!isAdmin) return msg.reply('❌ Solo los administradores pueden usar este comando.');
+            case 'todos':
+                if (!chat.isGroup) return msg.reply('❌ Este comando solo funciona en grupos.');
+                if (!isAdmin) return msg.reply('❌ Solo los administradores pueden usar este comando.');
 
-            let infoTexto = `📢 *MENSAJE GENERAL:* ${args.join(' ')}\n\n`;
-            let mencionesMiembros = [];
+                let infoTexto = `📢 *MENSAJE GENERAL:* ${args.join(' ')}\n\n`;
+                let mencionesMiembros = [];
 
-            for (let participante of chat.participants) {
-                const contacto = await client.getContactById(participante.id._serialized);
-                mencionesMiembros.push(contacto);
-                infoTexto += `@${participante.id.user} `;
-            }
-            await chat.sendMessage(infoTexto, { mentions: mencionesMiembros });
-            break;
+                for (let participante of chat.participants) {
+                    const contacto = await client.getContactById(participante.id._serialized);
+                    mencionesMiembros.push(contacto);
+                    infoTexto += `@${participante.id.user} `;
+                }
+                await chat.sendMessage(infoTexto, { mentions: mencionesMiembros });
+                break;
 
-        case 'aviso':
-            if (!chat.isGroup) return msg.reply('❌ Este comando solo funciona en grupos.');
-            if (!isAdmin) return msg.reply('❌ Solo administradores.');
+            case 'aviso':
+                if (!chat.isGroup) return msg.reply('❌ Este comando solo funciona en grupos.');
+                if (!isAdmin) return msg.reply('❌ Solo administradores.');
 
-            if (msg.hasQuotedMsg) {
-                const quotedMsg = await msg.getQuotedMessage();
-                let txtAviso = `📢 *\`AVISO IMPORTANTE DE ADM:\`*\n\n${quotedMsg.body}\n\n`;
-                let mentionsList = [];
+                if (msg.hasQuotedMsg) {
+                    const quotedMsg = await msg.getQuotedMessage();
+                    let txtAviso = `📢 *\`AVISO IMPORTANTE DE ADM:\`*\n\n${quotedMsg.body}\n\n`;
+                    let mentionsList = [];
+
+                    for (let part of chat.participants) {
+                        const cont = await client.getContactById(part.id._serialized);
+                        mentionsList.push(cont);
+                        txtAviso += `@${part.id.user} `;
+                    }
+                    await chat.sendMessage(txtAviso, { mentions: mentionsList });
+                } else {
+                    await msg.reply('❌ Responde a un mensaje escribiendo *.aviso* para reenviarlo a todos.');
+                }
+                break;
+
+            case 'admins':
+                if (!chat.isGroup) return;
+                let txtAdmins = `👑 *CONVOCANDO ADMINISTRADORES:* \n\n`;
+                let mencionesAdmins = [];
 
                 for (let part of chat.participants) {
-                    const cont = await client.getContactById(part.id._serialized);
-                    mentionsList.push(cont);
-                    txtAviso += `@${part.id.user} `;
+                    if (part.isAdmin || part.isSuperAdmin) {
+                        const cont = await client.getContactById(part.id._serialized);
+                        mencionesAdmins.push(cont);
+                        txtAdmins += `@${part.id.user} `;
+                    }
                 }
-                await chat.sendMessage(txtAviso, { mentions: mentionsList });
-            } else {
-                await msg.reply('❌ Responde a un mensaje escribiendo *.aviso* para reenviarlo a todos.');
-            }
-            break;
+                await chat.sendMessage(txtAdmins, { mentions: mencionesAdmins });
+                break;
 
-        case 'admins':
-            if (!chat.isGroup) return;
-            let txtAdmins = `👑 *CONVOCANDO ADMINISTRADORES:* \n\n`;
-            let mencionesAdmins = [];
-
-            for (let part of chat.participants) {
-                if (part.isAdmin || part.isSuperAdmin) {
-                    const cont = await client.getContactById(part.id._serialized);
-                    mencionesAdmins.push(cont);
-                    txtAdmins += `@${part.id.user} `;
+            case 'kick':
+                if (!chat.isGroup) return;
+                if (!isAdmin) return msg.reply('❌ No tienes permisos.');
+                if (msg.hasMentioned) {
+                    const ment = await msg.getMentions();
+                    await chat.removeParticipants([ment[0].id._serialized]);
+                    await chat.sendMessage(`👋 @${ment[0].id.user} ha sido eliminado del grupo.`, { mentions: [ment[0]] });
+                } else {
+                    await msg.reply('❌ Menciona a quién deseas eliminar. Ejemplo: .kick @usuario');
                 }
-            }
-            await chat.sendMessage(txtAdmins, { mentions: mencionesAdmins });
-            break;
+                break;
 
-        case 'kick':
-            if (!chat.isGroup) return;
-            if (!isAdmin) return msg.reply('❌ No tienes permisos.');
-            if (msg.hasMentioned) {
-                const ment = await msg.getMentions();
-                await chat.removeParticipants([ment[0].id._serialized]);
-                await chat.sendMessage(`👋 @${ment[0].id.user} ha sido eliminado del grupo.`, { mentions: [ment[0]] });
-            } else {
-                await msg.reply('❌ Menciona a quién deseas eliminar. Ejemplo: .kick @usuario');
-            }
-            break;
+            case 'promote':
+                if (!chat.isGroup || !isAdmin) return;
+                if (msg.hasMentioned) {
+                    const ment = await msg.getMentions();
+                    await chat.promoteParticipants([ment[0].id._serialized]);
+                    await msg.reply(`👑 ¡@${ment[0].id.user} ahora es Administrador!`);
+                }
+                break;
 
-        case 'promote':
-            if (!chat.isGroup || !isAdmin) return;
-            if (msg.hasMentioned) {
-                const ment = await msg.getMentions();
-                await chat.promoteParticipants([ment[0].id._serialized]);
-                await msg.reply(`👑 ¡@${ment[0].id.user} ahora es Administrador!`);
-            }
-            break;
+            case 'demote':
+                if (!chat.isGroup || !isAdmin) return;
+                if (msg.hasMentioned) {
+                    const ment = await msg.getMentions();
+                    await chat.demoteParticipants([ment[0].id._serialized]);
+                    await msg.reply(`📉 A @${ment[0].id.user} se le han retirado los privilegios de Administrador.`);
+                }
+                break;
 
-        case 'demote':
-            if (!chat.isGroup || !isAdmin) return;
-            if (msg.hasMentioned) {
-                const ment = await msg.getMentions();
-                await chat.demoteParticipants([ment[0].id._serialized]);
-                await msg.reply(`📉 A @${ment[0].id.user} se le han retirado los privilegios de Administrador.`);
-            }
-            break;
+            case 'grupo':
+                if (!chat.isGroup || !isAdmin) return;
+                if (args[0] === 'abrir') {
+                    await chat.setMessagesAdminsOnly(false);
+                    await chat.sendMessage('🔓 *El grupo ha sido abierto.* Todos los participantes pueden enviar mensajes.');
+                } else if (args[0] === 'cerrar') {
+                    await chat.setMessagesAdminsOnly(true);
+                    await chat.sendMessage('🔒 *El grupo ha sido cerrado.* Solo los administradores pueden enviar mensajes.');
+                }
+                break;
 
-        case 'grupo':
-            if (!chat.isGroup || !isAdmin) return;
-            if (args[0] === 'abrir') {
-                await chat.setMessagesAdminsOnly(false);
-                await chat.sendMessage('🔓 *El grupo ha sido abierto.* Todos los participantes pueden enviar mensajes.');
-            } else if (args[0] === 'cerrar') {
-                await chat.setMessagesAdminsOnly(true);
-                await chat.sendMessage('🔒 *El grupo ha sido cerrado.* Solo los administradores pueden enviar mensajes.');
-            }
-            break;
+            case 'ping':
+                const startPing = Date.now();
+                const reply = await msg.reply('🏓 Midiendo latencia...');
+                const endPing = Date.now();
+                await reply.edit(`🚀 *Pong!* Latencia: ${endPing - startPing}ms`);
+                break;
 
-        case 'ping':
-            const startPing = Date.now();
-            const reply = await msg.reply('🏓 Midiendo latencia...');
-            const endPing = Date.now();
-            await reply.edit(`🚀 *Pong!* Latencia: ${endPing - startPing}ms`);
-            break;
+            case 'owner':
+            case 'creador':
+                await msg.reply(`👤 *Creador del Bot:* KILLTBEST\n💬 *Contacto:* Escríbele al privado para soporte técnico.`);
+                break;
 
-        case 'owner':
-        case 'creador':
-            await chat.sendMessage(`👤 *Creador del Bot:* KILLTBEST\n💬 *Contacto:* Escríbele al privado para soporte técnico.`);
-            break;
-
-        default:
-            console.log(`Comando ingresado: .${command}`);
-            break;
+            default:
+                console.log(`Comando ingresado no registrado en switch: .${command}`);
+                break;
+        }
+    } catch (error) {
+        console.log('Error crítico procesando mensaje:', error);
     }
 });
 
