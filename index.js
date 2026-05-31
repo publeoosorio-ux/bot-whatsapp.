@@ -15,16 +15,18 @@ const startTime = new Date();
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        // Se eliminó la ruta de Termux para que sea compatible con la nube
+        headless: true,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
-            '--disable-extensions',
             '--disable-dev-shm-usage',
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--single-process'
+            '--single-process',
+            '--disable-gpu',
+            '--disable-extensions',
+            '--disable-software-rasterizer'
         ]
     }
 });
