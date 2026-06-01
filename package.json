@@ -1,14 +1,15 @@
 {
   "name": "bot-whatsapp",
   "version": "1.0.0",
-  "description": "Bot de WhatsApp en Railway",
+  "description": "Bot de WhatsApp con Inteligencia Artificial Gemini",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "axios": "^1.7.2",
+    "@google/generative-ai": "^0.11.0",
+    "axios": "^1.6.0",
     "qrcode-terminal": "^0.12.0",
-    "whatsapp-web.js": "^1.26.0"
+    "whatsapp-web.js": "^1.23.0"
   }
 }
