@@ -100,9 +100,10 @@ async function ejecutar(client, msg) {
                 }
                 try {
                     await msg.reply('🎵 Buscando canción y convirtiendo a MP3... Espera un momento.');
-                    // Cambiado a una API de respaldo mucho más estable
-                    const searchUrl = `https://api.zenkey.my.id/api/download/ytmp3?query=${encodeURIComponent(args.join(' '))}`;
-                    const res = await axios.get(searchUrl);
+                    
+                    // Nueva API alternativa súper rápida para descargas
+                    const resUrl = `https://api.vreden.web.id/api/ytmp3?url=${encodeURIComponent(args.join(' '))}`;
+                    const res = await axios.get(resUrl);
                     
                     if (res.data && res.data.result && res.data.result.downloadUrl) {
                         const audioUrl = res.data.result.downloadUrl;
@@ -114,10 +115,21 @@ async function ejecutar(client, msg) {
                         
                         await chat.sendMessage(mediaFile, { caption: `🎧 *Aquí tienes tu música:* ${tituloCancion}` });
                     } else {
-                        await msg.reply('❌ No se pudo procesar la descarga. Intenta con otra palabra clave.');
+                        // Segundo intento si el formato cambia
+                        const resAlt = await axios.get(`https://api.vreden.web.id/api/playmp3?query=${encodeURIComponent(args.join(' '))}`);
+                        if (resAlt.data && resAlt.data.result && resAlt.data.result.downloadUrl) {
+                            const audioUrl = resAlt.data.result.downloadUrl;
+                            const tituloCancion = resAlt.data.result.title || 'Audio';
+                            const mediaRes = await axios.get(audioUrl, { responseType: 'arraybuffer' });
+                            const base64Audio = Buffer.from(mediaRes.data, 'binary').toString('base64');
+                            const mediaFile = new MessageMedia('audio/mp3', base64Audio, `${tituloCancion}.mp3`);
+                            await chat.sendMessage(mediaFile, { caption: `🎧 *Aquí tienes tu música:* ${tituloCancion}` });
+                        } else {
+                            await msg.reply('❌ No se pudo procesar la descarga en este servidor. Intenta con otra canción.');
+                        }
                     }
                 } catch (e) {
-                    await msg.reply('❌ Error de conexión al descargar música. Prueba de nuevo en unos segundos.');
+                    await msg.reply('❌ Error de red al procesar el audio de música. Intenta de nuevo.');
                 }
                 break;
 
@@ -128,12 +140,12 @@ async function ejecutar(client, msg) {
                 }
                 try {
                     await msg.reply('🔍 Buscando videos en YouTube...');
-                    const resYts = await axios.get(`https://api.zenkey.my.id/api/search/ytsearch?query=${encodeURIComponent(args.join(' '))}`);
+                    const resYts = await axios.get(`https://api.vreden.web.id/api/ytsearch?query=${encodeURIComponent(args.join(' '))}`);
                     if (resYts.data && resYts.data.result && resYts.data.result.length > 0) {
                         let resultadoTexto = `🎥 *\`Resultados de YouTube\`*\n──────────────────\n\n`;
                         const videos = resYts.data.result.slice(0, 3);
                         videos.forEach((vid, i) => {
-                            resultadoTexto += `${i+1}️⃣ *${vid.title}*\n⏱️ *Duración:* ${vid.timestamp || 'Desconocida'}\n🔗 *Link:* ${vid.url}\n\n`;
+                            resultadoTexto += `${i+1}️⃣ *${vid.title}*\n⏱️ *Duración:* ${vid.duration || 'Desconocida'}\n🔗 *Link:* ${vid.url}\n\n`;
                         });
                         await msg.reply(resultadoTexto.trim());
                     } else {
@@ -152,14 +164,14 @@ async function ejecutar(client, msg) {
                 }
                 try {
                     await msg.reply('🧠 *KORI IA* pensando... dame un momento.');
-                    const peticion = await axios.get(`https://api.zenkey.my.id/api/ai/chatgpt?q=${encodeURIComponent(args.join(' '))}`);
+                    const peticion = await axios.get(`https://api.vreden.web.id/api/ai/chatgpt?query=${encodeURIComponent(args.join(' '))}`);
                     if (peticion.data && peticion.data.result) {
                         await msg.reply(`🤖 *Respuesta de IA:* \n\n${peticion.data.result}`);
                     } else {
-                        await msg.reply('❌ La IA está en mantenimiento, intenta más tarde.');
+                        await msg.reply('❌ La IA no respondió correctamente.');
                     }
                 } catch (e) {
-                    await msg.reply('❌ Hubo un fallo al conectar con el cerebro de la IA.');
+                    await msg.reply('❌ Hubo un fallo al conectar con la IA.');
                 }
                 break;
 
@@ -235,15 +247,7 @@ async function ejecutar(client, msg) {
                 break;
 
             case 'aviso':
-                if (!chat.isGroup) {
-                    await msg.reply('❌ Este comando solo funciona en grupos.');
-                    break;
-                }
-                if (!isAdmin) {
-                    await msg.reply('❌ Solo administradores.');
-                    break;
-                }
-
+                if (!chat.isGroup || !isAdmin) break;
                 if (msg.hasQuotedMsg) {
                     const quotedMsg = await msg.getQuotedMessage();
                     let txtAviso = `📢 *\`AVISO IMPORTANTE DE ADM:\`*\n\n${quotedMsg.body || ''}`;
@@ -257,8 +261,6 @@ async function ejecutar(client, msg) {
                         } catch (err) {}
                     }
                     await chat.sendMessage(txtAviso);
-                } else {
-                    await msg.reply('❌ Responde a un mensaje escribiendo *.aviso*');
                 }
                 break;
 
@@ -271,16 +273,11 @@ async function ejecutar(client, msg) {
                     } else {
                         await chat.sendMessage(quoted.body);
                     }
-                } else {
-                    await msg.reply('❌ Responde a un mensaje con *.reenviar*');
                 }
                 break;
 
             case 'todos':
-                if (!chat.isGroup || !isAdmin) {
-                    await msg.reply('❌ Solo administradores en grupos.');
-                    break;
-                }
+                if (!chat.isGroup || !isAdmin) break;
                 const mensajeAdicional = args.join(' ');
                 let infoTexto = `📣 *KORI BOT LOS INVOCA* 📣\n`;
                 if (mensajeAdicional) infoTexto += `📝 *Mensaje:* ${mensajeAdicional}\n`;
@@ -345,55 +342,6 @@ async function ejecutar(client, msg) {
 
             case 'ping':
                 await msg.reply('🚀 *Pong!* Bot activo y respondiendo rápido.');
-                break;
-
-            case 'admins':
-                if (!chat.isGroup) break;
-                let txtAdmins = `👑 *CONVOCANDO ADMINISTRADORES:* \n\n`;
-                let mencionesAdmins = [];
-                for (let part of chat.participants) {
-                    if (part.isAdmin || part.isSuperAdmin) {
-                        try {
-                            const cont = await client.getContactById(part.id._serialized);
-                            mencionesAdmins.push(cont);
-                            txtAdmins += `@${part.id.user} `;
-                        } catch (e) {}
-                    }
-                }
-                await chat.sendMessage(txtAdmins, { mentions: mencionesAdmins });
-                break;
-
-            case 'kick':
-                if (!chat.isGroup || !isAdmin) break;
-                if (msg.hasMentioned) {
-                    const ment = await msg.getMentions();
-                    await chat.removeParticipants([ment[0].id._serialized]);
-                }
-                break;
-
-            case 'promote':
-                if (!chat.isGroup || !isAdmin) break;
-                if (msg.hasMentioned) {
-                    const ment = await msg.getMentions();
-                    await chat.promoteParticipants([ment[0].id._serialized]);
-                }
-                break;
-
-            case 'demote':
-                if (!chat.isGroup || !isAdmin) break;
-                if (msg.hasMentioned) {
-                    const ment = await msg.getMentions();
-                    await chat.demoteParticipants([ment[0].id._serialized]);
-                }
-                break;
-
-            case 'grupo':
-                if (!chat.isGroup || !isAdmin) break;
-                if (args[0] === 'abrir') {
-                    await chat.setMessagesAdminsOnly(false);
-                } else if (args[0] === 'cerrar') {
-                    await chat.setMessagesAdminsOnly(true);
-                }
                 break;
 
             case 's':
