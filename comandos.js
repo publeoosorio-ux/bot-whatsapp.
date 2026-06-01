@@ -2,7 +2,7 @@ const { MessageMedia } = require('whatsapp-web.js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const axios = require('axios');
 
-// 🔑 CLAVE API DIRECTA DE TU CAPTURA
+// 🔑 Configuración de Credenciales Primarias
 const GEMINI_API_KEY = "AQ.Ab8RN6J-5x57rikx5NrolJCHCHnRxkmHK0psnMdo8-0yDAA5yA"; 
 
 let aiModel = null;
@@ -11,27 +11,30 @@ try {
         const aiConfig = new GoogleGenerativeAI(GEMINI_API_KEY);
         aiModel = aiConfig.getGenerativeModel({ model: "gemini-1.5-flash" });
     }
-} catch (error) {
-    console.log("Error al cargar Gemini nativo:", error);
-}
+} catch (e) { console.log("Error inicializando Gemini."); }
 
 const startTime = new Date();
 const rpgDatabase = {};
+const groupSettings = {}; // Almacena eventos de bienvenida/despedida
+
+// Estructura de Sub-Bots vinculados
+const subBotsActivos = []; 
 
 function getProfile(userId, pushname) {
     if (!rpgDatabase[userId]) {
         rpgDatabase[userId] = {
             name: pushname || 'Usuario',
-            coins: 500, 
-            bank: 1000,
-            gems: 15,
-            level: 0,
-            xp: 0,
-            lastDaily: 0,
-            lastWork: 0
+            coins: 500, bank: 1000, gems: 15, level: 0, xp: 0, lastDaily: 0, lastWork: 0
         };
     }
     return rpgDatabase[userId];
+}
+
+function getGroupConfig(chatId) {
+    if (!groupSettings[chatId]) {
+        groupSettings[chatId] = { welcome: false, bye: false };
+    }
+    return groupSettings[chatId];
 }
 
 async function ejecutar(client, msg) {
@@ -39,15 +42,11 @@ async function ejecutar(client, msg) {
         if (!msg.body) return;
         const body = msg.body.trim();
         
-        if (!body.startsWith('.') && !body.toLowerCase().startsWith('aviso')) return;
+        // Listener universal para comandos (. o sub-comandos)
+        if (!body.startsWith('.')) return;
 
         const args = body.slice(1).trim().split(/ +/);
         let command = args.shift().toLowerCase();
-
-        if (body === '.menu') {
-            command = 'bot';
-            args[0] = 'menú';
-        }
 
         const chat = await msg.getChat();
         const sender = await msg.getContact();
@@ -57,117 +56,168 @@ async function ejecutar(client, msg) {
         let isAdmin = false;
         if (chat.isGroup) {
             const participant = chat.participants.find(p => p.id._serialized === sender.id._serialized);
-            if (participant && (participant.isAdmin || participant.isSuperAdmin)) {
-                isAdmin = true;
-            }
+            if (participant && (participant.isAdmin || participant.isSuperAdmin)) isAdmin = true;
         }
 
+        // Determinar si quien responde es un Sub-bot para limitar sus acciones
+        const esSubBot = subBotsActivos.includes(client.info?.wid?._serialized);
+
         switch (command) {
+            case 'menu':
             case 'bot':
-                if (args[0]?.toLowerCase() === 'menú' || args[0]?.toLowerCase() === 'menu') {
-                    const uptimeDiff = Math.abs(new Date() - startTime);
-                    const hours = Math.floor(uptimeDiff / (1000 * 60 * 60));
-                    const minutes = Math.floor((uptimeDiff % (1000 * 60 * 60)) / (1000 * 60));
-                    const seconds = Math.floor((uptimeDiff % (1000 * 60)) / 1000);
+                if (esSubBot) {
+                    // 🎮 MENÚ REDUCIDO EXCLUSIVO PARA SUB-BOTS (Diversión y Juegos)
+                    const menuSub = `╔════════════════════════╗
+  🤖  *KORI - SUB BOT OFICIAL* ╚════════════════════════╝
+ 👤 *Usuario:* ${username}
+ 🕹 *Modo:* Entretenimiento Activo
+──────────────────────────
+ 🎰 *\`Zona de Juegos & RPG\`*
+ ➣ \`.perfil\` - Mira tu cuenta virtual
+ ➣ \`.trabajar\` - Gana monedas cada 5 min
+ ➣ \`.daily\` - Tu recompensa diaria
+ ➣ \`.ruleta <cant>\` - Apuesta tus monedas
 
-                    const menuTexto = `🌐 *\`Menú Principal (KORI BOT)\`*
-────────────────────────────
-👤 Usuario: ${username.toUpperCase()}
-🔰 Rol: Novato \`\`\`V\`\`\` ⚔️
-⏱ Activo: ${hours}:${minutes}:${seconds}
+ 🍯 *\`Interacción & Diversión\`*
+ ➣ \`.chiste\` - Envía un chiste al azar
+ ➣ \`.piropo\` - Lanza un piropo piola
+ ➣ \`.consejo\` - Un consejo de vida
+ ➣ \`.fraseromantica\` - Frase especial
+ ➣ \`.s\` o \`.sticker\` - Convierte fotos
 
-📊 *\`Info & Sistema\`* ╰➤ .owner | .ping | .uptime | .sistema
-
-👥 *\`Gestión de Grupos\`*
-╰➤ .todos <txt> | .aviso | .admins | .kick @usuario
-╰➤ .promote @usuario | .demote @usuario | .grupo abrir/cerrar | .reenviar
-
-⬇ *\`Descargas Automáticas\`*
-╰➤ .play <canción> *(Música MP3)*
-╰➤ .video <nombre> *(Video MP4)*
-
-💭 *\`Sección de Inteligencia Artificial\`*
-╰➤ .gemini <pregunta> *(Motor Google Directo)*
-╰➤ .chatgpt <pregunta> *(Motor OpenAI GPT)*
-╰➤ .ia <pregunta> *(IA de Respuesta Rápida)*
-
-🔍 *\`Búsquedas & Herramientas\`*
-╰➤ .yts <búsqueda> | .s | .sticker | .google <tema>
-
-🍯 *\`Diversión & Utilidades\`*
-╰➤ .consejo | .fraseromantica | .piropo | .chiste | .clima <ciudad> | .dolar
-
-🥧 *\`Free Fire Area\`*
-╰➤ .4vs4 | .66vs6 | .8vs8 | .12vs12 | .sala`;
-
-                    await msg.reply(menuTexto);
-                }
-                break;
-
-            case 'play':
-                if (!args.length) {
-                    await msg.reply('❌ Escribe el nombre de la canción. Ejemplo: `.play Sia Unstoppable`');
+ 📢 *Nota:* Este es un Sub-Bot de interacción. Para comandos avanzados de IA y Descargas, usa al Bot Principal.`;
+                    await msg.reply(menuSub);
                     break;
                 }
+
+                // 👑 INTERFAZ ESTÉTICA PREMIUM PARA EL BOT PRINCIPAL
+                const uptimeDiff = Math.abs(new Date() - startTime);
+                const hours = Math.floor(uptimeDiff / (1000 * 60 * 60));
+                const minutes = Math.floor((uptimeDiff % (1000 * 60 * 60)) / (1000 * 60));
+
+                const menuPremium = `╭━━━〔 ✨ *KORI BOT PREMIUM* ✨ 〕━━━🎬
+┃ 💎 *Estado:* Online / Estable
+┃ 👤 *Usuario:* ${username.toUpperCase()}
+┃ ⏱️ *Uptime:* ${hours}h ${minutes}m
+╰─────────────────────────────🍁
+
+ ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+ ┃ 🎵  *DESCARGAS MULTIMEDIA* ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+  ☞ \`.play <nombre>\` ── Audio HQ (MP3)
+  ☞ \`.video <nombre>\` ── Video HD (MP4)
+  ☞ \`.yts <texto>\` ── Buscador de enlaces
+
+ ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+ ┃ 🧠  *CEREBROS DE INTELIGENCIA* ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+  ☞ \`.perplexity <pregunta>\` ── Respuestas con fuentes
+  ☞ \`.chatgpt <pregunta>\` ── OpenAI Inteligencia
+  ☞ \`.gemini <pregunta>\` ── Motor Google directo
+  ☞ \`.ia <pregunta>\` ── Auto-selector veloz
+
+ ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+ ┃ 🛡️  *HERRAMIENTAS DE GRUPO* ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+  ☞ \`.welcome on/off\` ── Alternar bienvenida
+  ☞ \`.bye on/off\` ── Alternar despedida
+  ☞ \`.todos <motivo>\` ── Mención general
+  ☞ \`.aviso\` ── Fijar mensaje de Administrador
+  ☞ \`.reenviar\` ── Clonar contenido multimedia
+
+ ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+ ┃ 🕹️  *SISTEMA VIRTUAL RPG & FUN*
+ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+  ☞ \`.perfil\` | \`.trabajar\` | \`.daily\` | \`.ruleta\`
+  ☞ \`.google\` | \`.clima\` | \`.dolar\` | \`.chiste\`
+  ☞ \`.piropo\` | \`.s\` *(Stickers)*
+
+ ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+ ┃ 🤖  *CENTRAL DE SUB-BOTS* ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+  ☞ \`.subbot\` ── Vincular nuevo número o clon`;
+                await msg.reply(menuPremium);
+                break;
+                case 'play':
+                if (esSubBot) return msg.reply('❌ Comando deshabilitado en Sub-Bots.');
+                if (!args.length) return msg.reply('❌ Escribe el nombre de la canción.');
                 try {
-                    await msg.reply('🎵 Buscando canción y procesando audio... Por favor espera.');
+                    await msg.reply('🎵 Procesando audio mediante servidores espejo...');
                     const query = encodeURIComponent(args.join(' '));
                     
-                    const res = await axios.get(`https://api.cafirexos.com/api/ytplay?text=${query}`);
+                    // Servidor Primario (Cafirexos)
+                    let res = await axios.get(`https://api.cafirexos.com/api/ytplay?text=${query}`).catch(() => null);
                     
-                    if (res.data && res.data.resultado && res.data.resultado.url) {
-                        const audioUrl = res.data.resultado.url;
-                        const titulo = res.data.resultado.titulo || 'Audio';
-                        
+                    // Servidor Secundario (Espejo de Respaldo por si falla el primero)
+                    if (!res || !res.data?.resultado?.url) {
+                        res = await axios.get(`https://api.vreden.my.id/api/ytplay?query=${query}`).catch(() => null);
+                    }
+
+                    const audioUrl = res?.data?.resultado?.url || res?.data?.result?.downloadUrl;
+                    const titulo = res?.data?.resultado?.titulo || res?.data?.result?.title || 'Audio HQ';
+
+                    if (audioUrl) {
                         const mediaRes = await axios.get(audioUrl, { responseType: 'arraybuffer' });
                         const base64Audio = Buffer.from(mediaRes.data, 'binary').toString('base64');
                         const mediaFile = new MessageMedia('audio/mp3', base64Audio, `${titulo}.mp3`);
-                        
-                        await chat.sendMessage(mediaFile, { caption: `🎧 *Completado:* ${titulo}` });
+                        await chat.sendMessage(mediaFile, { caption: `🎧 *Kori Play:* ${titulo}` });
                     } else {
-                        await msg.reply('❌ No se pudo descargar esta pista de audio.');
+                        await msg.reply('❌ Todos los servidores de música están saturados. Intenta de nuevo.');
                     }
-                } catch (e) {
-                    await msg.reply('❌ Servidor de música saturado o caída de YouTube.');
-                }
+                } catch (e) { await msg.reply('❌ Falla en la conversión de audio.'); }
                 break;
 
             case 'video':
-                if (!args.length) {
-                    await msg.reply('❌ Escribe el nombre del video. Ejemplo: `.video goles`');
-                    break;
-                }
+                if (esSubBot) return msg.reply('❌ Comando deshabilitado en Sub-Bots.');
+                if (!args.length) return msg.reply('❌ Escribe el nombre del video.');
                 try {
-                    await msg.reply('🎥 Buscando y procesando el video... Por favor espera.');
+                    await msg.reply('🎥 Buscando y compactando video MP4...');
                     const query = encodeURIComponent(args.join(' '));
-                    const res = await axios.get(`https://api.cafirexos.com/api/v1/ytmp4?url=${query}`);
                     
-                    let videoUrl = res.data?.resultado?.download || res.data?.resultado?.url;
+                    let res = await axios.get(`https://api.cafirexos.com/api/v1/ytmp4?url=${query}`).catch(() => null);
+                    let videoUrl = res?.data?.resultado?.download || res?.data?.resultado?.url;
+
+                    if (!videoUrl) { // Respaldo redundante
+                        res = await axios.get(`https://api.vreden.my.id/api/ytmp4?query=${query}`).catch(() => null);
+                        videoUrl = res?.data?.result?.downloadUrl;
+                    }
+
                     if (videoUrl) {
                         const mediaRes = await axios.get(videoUrl, { responseType: 'arraybuffer' });
                         const base64Video = Buffer.from(mediaRes.data, 'binary').toString('base64');
                         const mediaFile = new MessageMedia('video/mp4', base64Video, `video.mp4`);
-                        await chat.sendMessage(mediaFile, { caption: `🎬 Video procesado correctamente.` });
+                        await chat.sendMessage(mediaFile, { caption: `🎬 Video cargado con éxito.` });
                     } else {
-                        await msg.reply('❌ Intenta con un término más específico para el video.');
+                        await msg.reply('❌ Archivo de video demasiado pesado o no encontrado.');
                     }
-                } catch (e) {
-                    await msg.reply('❌ Error al procesar el archivo MP4 de video.');
-                }
+                } catch (e) { await msg.reply('❌ Error en el servidor de streaming de video.'); }
                 break;
-                case 'gemini':
-                if (!args.length) return msg.reply('❌ Escribe tu consulta.');
-                if (!aiModel) return msg.reply('❌ Motor Gemini directo deshabilitado.');
+
+            case 'perplexity':
+                if (!args.length) return msg.reply('❌ Introduce tu consulta para Perplexity.');
                 try {
-                    await msg.reply('🧠 *KORI IA (Gemini Directo)* pensando...');
-                    const prompt = args.join(' ');
-                    const result = await aiModel.generateContent(prompt);
-                    const response = await result.response;
-                    const text = response.text();
-                    await msg.reply(`🤖 *Respuesta de Gemini:* \n\n${text}`);
-                } catch (err) {
-                    await msg.reply('❌ Error en tu clave API o cuota de Gemini agotada.');
-                }
+                    await msg.reply('🔍 *KORI IA (Perplexity)* investigando en la web en tiempo real...');
+                    const prompt = encodeURIComponent(args.join(' '));
+                    const res = await axios.get(`https://api.cafirexos.com/api/perplexity?text=${prompt}`);
+                    if (res.data && res.data.resultado) {
+                        await msg.reply(`🧠 *Perplexity AI (Resultados Verificados):* \n\n${res.data.resultado}`);
+                    } else {
+                        await msg.reply('❌ Respuesta nula de Perplexity. Prueba usando `.chatgpt`');
+                    }
+                } catch (err) { await msg.reply('❌ Servidor de Perplexity temporalmente fuera de línea.'); }
+                break;
+
+            case 'gemini':
+                if (!args.length) return msg.reply('❌ Por favor, redacta una pregunta.');
+                try {
+                    if (aiModel) {
+                        await msg.reply('🧠 *KORI IA (Gemini Directo)* procesando con tu API Key...');
+                        const result = await aiModel.generateContent(args.join(' '));
+                        const response = await result.response;
+                        await msg.reply(`🤖 *Gemini Directo:* \n\n${response.text()}`);
+                    } else {
+                        // Espejo si la clave falla
+                        const prompt = encodeURIComponent(args.join(' '));
+                        const res = await axios.get(`https://api.cafirexos.com/api/gemini?text=${prompt}`);
+                        await msg.reply(`🤖 *Gemini Espejo:* \n\n${res.data.resultado}`);
+                    }
+                } catch (err) { await msg.reply('❌ Fallo crítico en motores Gemini. Usa `.perplexity`'); }
                 break;
 
             case 'ia':
@@ -178,33 +228,50 @@ async function ejecutar(client, msg) {
                     const prompt = encodeURIComponent(args.join(' '));
                     const res = await axios.get(`https://api.cafirexos.com/api/chatgpt?text=${prompt}`);
                     if (res.data && res.data.resultado) {
-                        await msg.reply(`🤖 *Respuesta de ChatGPT:* \n\n${res.data.resultado}`);
+                        await msg.reply(`🤖 *ChatGPT:* \n\n${res.data.resultado}`);
                     } else {
-                        await msg.reply('❌ Servidor de ChatGPT vacío. Intenta con `.gemini`');
+                        await msg.reply('❌ Error de respuesta. Intenta con `.perplexity`');
                     }
-                } catch (err) {
-                    await msg.reply('❌ Error de conexión con el motor IA externo.');
-                }
+                } catch (err) { await msg.reply('❌ Caída de los servicios OpenAI.'); }
+                break;
+                case 'welcome':
+                if (!chat.isGroup || !isAdmin) return msg.reply('❌ Solo administradores en grupos.');
+                if (args[0] === 'on') {
+                    getGroupConfig(chat.id._serialized).welcome = true;
+                    await msg.reply('✅ *Mensajes de Bienvenida:* ACTIVADOS para este grupo.');
+                } else if (args[0] === 'off') {
+                    getGroupConfig(chat.id._serialized).welcome = false;
+                    await msg.reply('❌ *Mensajes de Bienvenida:* DESACTIVADOS.');
+                } else { await msg.reply('💡 Uso correcto: `.welcome on` o `.welcome off`'); }
+                break;
+
+            case 'bye':
+                if (!chat.isGroup || !isAdmin) return msg.reply('❌ Solo administradores en grupos.');
+                if (args[0] === 'on') {
+                    getGroupConfig(chat.id._serialized).bye = true;
+                    await msg.reply('✅ *Mensajes de Despedida:* ACTIVADOS para este grupo.');
+                } else if (args[0] === 'off') {
+                    getGroupConfig(chat.id._serialized).bye = false;
+                    await msg.reply('❌ *Mensajes de Despedida:* DESACTIVADOS.');
+                } else { await msg.reply('💡 Uso correcto: `.bye on` o `.bye off`'); }
+                break;
+
+            case 'subbot':
+                if (esSubBot) return;
+                await msg.reply('🤖 *Iniciando módulo Sub-Bot Multi-Números...*\n\nPara vincular un nuevo sub-bot secundario con lista de comandos de entretenimiento reducida, contacta al desarrollador principal para emparejar el código QR o Token de sesión.');
                 break;
 
             case 'yts':
-                if (!args.length) return msg.reply('❌ Escribe qué deseas buscar.');
+                if (!args.length) return msg.reply('❌ ¿Qué deseas buscar?');
                 try {
-                    await msg.reply('🔍 Buscando videos en YouTube...');
                     const query = encodeURIComponent(args.join(' '));
                     const resYts = await axios.get(`https://api.cafirexos.com/api/ytsearch?text=${query}`);
-                    if (resYts.data && resYts.data.resultado && resYts.data.resultado.length > 0) {
-                        let resultadoTexto = `🎥 *\`Resultados de YouTube\`*\n──────────────────\n\n`;
-                        resYts.data.resultado.slice(0, 3).forEach((vid, i) => {
-                            resultadoTexto += `${i+1}️⃣ *${vid.title}*\n🔗 *Link:* ${vid.url}\n\n`;
-                        });
-                        await msg.reply(resultadoTexto.trim());
-                    } else {
-                        await msg.reply('❌ No se encontraron videos.');
+                    if (resYts.data?.resultado) {
+                        let txt = `🎥 *\`Búsquedas de YouTube\`*\n\n`;
+                        resYts.data.resultado.slice(0,3).forEach((v, i) => { txt += `${i+1}️⃣ *${v.title}*\n🔗 ${v.url}\n\n`; });
+                        await msg.reply(txt.trim());
                     }
-                } catch (e) {
-                    await msg.reply('❌ Error al conectar con YouTube.');
-                }
+                } catch (e) { await msg.reply('❌ Error de consulta.'); }
                 break;
 
             case 'google':
@@ -212,18 +279,12 @@ async function ejecutar(client, msg) {
                 try {
                     const query = encodeURIComponent(args.join(' '));
                     const res = await axios.get(`https://api.cafirexos.com/api/google?text=${query}`);
-                    if (res.data && res.data.resultado && res.data.resultado.length > 0) {
-                        let txt = `🔍 *\`Resultados de Google\`*\n──────────────────\n\n`;
-                        res.data.resultado.slice(0, 3).forEach((r) => {
-                            txt += `🔹 *${r.title}*\n🔗 _${r.link}_\n\n`;
-                        });
+                    if (res.data?.resultado) {
+                        let txt = `🔍 *\`Google Search\`*\n\n`;
+                        res.data.resultado.slice(0,3).forEach((r) => { txt += `🔹 *${r.title}*\n🔗 _${r.link}_\n\n`; });
                         await msg.reply(txt.trim());
-                    } else {
-                        await msg.reply('❌ No se encontraron resultados.');
                     }
-                } catch (e) {
-                    await msg.reply('❌ Servidor de Google en mantenimiento.');
-                }
+                } catch (e) { await msg.reply('❌ Error de red.'); }
                 break;
 
             case 'clima':
@@ -231,202 +292,96 @@ async function ejecutar(client, msg) {
                 try {
                     const ciudad = encodeURIComponent(args.join(' '));
                     const res = await axios.get(`https://api.cafirexos.com/api/clima?text=${ciudad}`);
-                    if (res.data && res.data.resultado) {
-                        await msg.reply(`☀️ *\`Clima\`*\n──────────────────\n${res.data.resultado}`);
-                    } else {
-                        await msg.reply('❌ Ciudad no encontrada.');
-                    }
-                } catch (e) {
-                    await msg.reply('❌ Error al consultar el tiempo.');
-                }
+                    await msg.reply(`☀️ *Condiciones Climáticas:* \n\n${res.data.resultado || 'No disponible.'}`);
+                } catch (e) { await msg.reply('❌ Error del clima.'); }
                 break;
 
             case 'dolar':
                 try {
                     const res = await axios.get('https://api.exchangerate-api.com/v4/latest/USD');
-                    if (res.data && res.data.rates) {
-                        const r = res.data.rates;
-                        await msg.reply(`💵 *\`Precio del Dólar Actual\`*\n──────────────────\n🇵🇪 *Perú:* S/. ${r.PEN.toFixed(2)}\n🇲🇽 *México:* $${r.MXN.toFixed(2)}\n🇦🇷 *Argentina:* $${r.ARS.toFixed(2)}`);
-                    }
-                } catch (e) {
-                    await msg.reply('❌ Error al obtener cotización.');
-                }
+                    const r = res.data.rates;
+                    await msg.reply(`💵 *\`Tipo de Cambio Financiero\`*\n🇵🇪 *Perú:* S/. ${r.PEN.toFixed(2)}\n🇲🇽 *México:* $${r.MXN.toFixed(2)}`);
+                } catch (e) { await msg.reply('❌ Error financiero.'); }
                 break;
 
             case 'chiste':
-                const chistes = [
-                    "— Papá, papá, ¿qué se siente tener un hijo tan guapo? \n— No sé hijo, pregúntale a tu abuelo. 😂",
-                    "¿Qué hace una abeja en el gimnasio? \n¡Zumba! 🐝"
-                ];
+                const chistes = ["— ¿Qué hace una impresora de cabeza? \n— Imprimiendo en reversa. 😂", "— ¿Por qué los programadores prefieren la oscuridad? \n— Porque la luz produce bugs. 💻"];
                 await msg.reply(`🃏 *Chiste:* \n\n${chistes[Math.floor(Math.random() * chistes.length)]}`);
+                break;
+
+            case 'piropo':
+                await msg.reply("🍯 *Piropo:* Eres el código sin errores que todo programador sueña con encontrar. 😏");
+                break;
+
+            case 'consejo':
+                await msg.reply("💡 *Consejo:* Mantén tus sub-bots limpios de comandos multimedia para ahorrar memoria RAM.");
+                break;
+
+            case 'fraseromantica':
+                await msg.reply('❤️ "Ni la inteligencia artificial junta podría computar todo lo que me importas."');
                 break;
 
             case 'perfil':
                 const perfil = getProfile(userId, username);
-                await msg.reply(`📇 *\`Tu Perfil Virtual (RPG)\`*\n──────────────────\n👤 *Nombre:* ${perfil.name}\n⚔️ *Rango:* Novato\n💰 *Bolsillo:* $${perfil.coins} monedas`);
+                await msg.reply(`📇 *\`Perfil Kori Virtual\`*\n👤 *Nombre:* ${perfil.name}\n💰 *Bolsillo:* $${perfil.coins} monedas`);
                 break;
 
             case 'work':
             case 'trabajar':
                 const pWork = getProfile(userId, username);
-                const tiempoActual = Date.now();
-                if (tiempoActual - pWork.lastWork < 300000) {
-                    const restante = Math.ceil((300000 - (tiempoActual - pWork.lastWork)) / 1000);
-                    await msg.reply(`⏳ Espera *${restante} segundos*.`);
-                    break;
-                }
-                const ganancias = Math.floor(Math.random() * (400 - 150 + 1)) + 150;
-                pWork.coins += ganancias;
-                pWork.lastWork = tiempoActual;
-                await msg.reply(`💰 Ganaste *$${ganancias} monedas virtuales*.`);
+                const tActual = Date.now();
+                if (tActual - pWork.lastWork < 300000) return msg.reply('⏳ Estás exhausto, descansa unos minutos.');
+                const gan = Math.floor(Math.random() * 300) + 100;
+                pWork.coins += gan; pWork.lastWork = tActual;
+                await msg.reply(`💰 Trabajaste y ganaste *$${gan} monedas virtuales*.`);
                 break;
 
             case 'daily':
                 const pDaily = getProfile(userId, username);
-                const ahora = Date.now();
-                if (ahora - pDaily.lastDaily < 86400000) {
-                    await msg.reply('❌ Ya lo reclamaste hoy.');
-                    break;
-                }
-                pDaily.coins += 1000;
-                pDaily.lastDaily = ahora;
-                await msg.reply('🎁 *RECOMPENSA DIARIA* 🎁\n💵 *+$1,000 monedas*');
+                const nw = Date.now();
+                if (nw - pDaily.lastDaily < 86400000) return msg.reply('❌ Ya cobraste tu bono diario.');
+                pDaily.coins += 1000; pDaily.lastDaily = nw;
+                await msg.reply('🎁 *Bono Diario reclamado:* +$1,000 monedas.');
                 break;
 
             case 'ruleta':
                 const pRuleta = getProfile(userId, username);
-                if (!args.length || isNaN(args[0])) return msg.reply('❌ Introduce cantidad.');
+                if (!args.length || isNaN(args[0])) return msg.reply('❌ Pon una cantidad válida.');
                 const apuesta = parseInt(args[0]);
-                if (pRuleta.coins < apuesta) return msg.reply('❌ Dinero insuficiente.');
-                if (Math.random() >= 0.5) {
-                    pRuleta.coins += apuesta;
-                    await msg.reply(`🎰 *Ganaste:* +$${apuesta} monedas.`);
-                } else {
-                    pRuleta.coins -= apuesta;
-                    await msg.reply(`🎰 *Perdiste:* -$${apuesta} monedas.`);
-                }
-                break;
-
-            case 'aviso':
-                if (!chat.isGroup || !isAdmin) break;
-                if (msg.hasQuotedMsg) {
-                    const quotedMsg = await msg.getQuotedMessage();
-                    let txtAviso = `📢 *\`AVISO IMPORTANTE DE ADM:\`*\n\n${quotedMsg.body || ''}`;
-                    if (quotedMsg.hasMedia) {
-                        try {
-                            const mediaAviso = await quotedMsg.downloadMedia();
-                            await chat.sendMessage(mediaAviso, { caption: txtAviso });
-                            break;
-                        } catch (err) {}
-                    }
-                    await chat.sendMessage(txtAviso);
-                }
-                break;
-
-            case 'reenviar':
-                if (msg.hasQuotedMsg) {
-                    const quoted = await msg.getQuotedMessage();
-                    if (quoted.hasMedia) {
-                        const archivoMedia = await quoted.downloadMedia();
-                        await chat.sendMessage(archivoMedia, { caption: quoted.body || '' });
-                    } else {
-                        await chat.sendMessage(quoted.body);
-                    }
-                }
+                if (pRuleta.coins < apuesta) return msg.reply('❌ Saldo insuficiente.');
+                if (Math.random() >= 0.5) { pRuleta.coins += apuesta; await msg.reply(`🎰 ¡Ganaste! +$${apuesta}`); }
+                else { pRuleta.coins -= apuesta; await msg.reply(`🎰 Perdiste... -$${apuesta}`); }
                 break;
 
             case 'todos':
                 if (!chat.isGroup || !isAdmin) break;
-                let infoTexto = `📣 *KORI BOT LOS INVOCA* 📣\n────────────────────────────\n`;
-                let mencionesMiembros = [];
-                for (let participante of chat.participants) {
+                let infoTexto = `📣 *CONVOCATORIA GENERAL* 📣\n\n`;
+                let menciones = [];
+                for (let part of chat.participants) {
                     try {
-                        const contacto = await client.getContactById(participante.id._serialized);
-                        mencionesMiembros.push(contacto);
-                        infoTexto += `💚➪@${participante.id.user}\n`;
+                        const contact = await client.getContactById(part.id._serialized);
+                        menciones.push(contact);
+                        infoTexto += `@${part.id.user} `;
                     } catch (e) {}
                 }
-                await chat.sendMessage(infoTexto.trim(), { mentions: mencionesMiembros });
-                break;
-
-            case 'owner':
-            case 'creador':
-                await msg.reply(`👤 *Creador del Bot:* DEYVI A.O.C\n💬 *Contacto:* +51 900834505`);
-                break;
-
-            case 'reg':
-                await msg.reply(`✅ *¡Registro Exitoso!* Hola ${username}.`);
-                break;
-
-            case 'unreg':
-                await msg.reply('❌ *Registro Eliminado.*');
-                break;
-
-            case '4vs4':
-            case '6vs6':
-            case '8vs8':
-            case '12vs12':
-                await msg.reply(`🎮 *¡Convocatoria de Free Fire Activa!* \n\n@everyone ¡Se armó el *${command.toUpperCase()}*!`);
-                break;
-
-            case 'sala':
-                await msg.reply('🔑 ⚔️ *CREACIÓN DE SALA FREE FIRE* ⚔️\n\n🆔 *ID de Sala:* Cargando...');
-                break;
-
-            case 'piropo':
-                const piropos = ["¿Acaso eres Google? Porque tienes todo lo que busco. 😏"];
-                await msg.reply(`🍯 *Piropo:* \n\n${piropos[Math.floor(Math.random() * piropos.length)]}`);
-                break;
-
-            case 'consejo':
-                await msg.reply(`💡 *Consejo:* Usa comandos espaciados.`);
-                break;
-
-            case 'fraseromantica':
-                await msg.reply('❤️ *Frase:* "Eres mi variable favorita en este código."');
-                break;
-
-            case 'uptime':
-                const uptimeDiff = Math.abs(new Date() - startTime);
-                await msg.reply(`⏱️ *Activo:* ${Math.floor(uptimeDiff / (1000 * 60 * 60))} horas.`);
-                break;
-
-            case 'sistema':
-                await msg.reply(`🖥️ *Servidor:* Linux\n📦 *Entorno:* Node.js v22\n🛠️ *IAs Conectadas:* Gemini Directo, ChatGPT.`);
-                break;
-
-            case 'ping':
-                await msg.reply('🚀 *Pong!* Bot activo y respondiendo rápido.');
+                await chat.sendMessage(infoTexto.trim(), { mentions: menciones });
                 break;
 
             case 's':
             case 'sticker':
                 if (msg.hasMedia || (msg.hasQuotedMsg && (await msg.getQuotedMessage()).hasMedia)) {
                     try {
-                        await msg.reply('⏳ *Procesando tu Sticker...*');
-                        const mensajeConFoto = msg.hasMedia ? msg : await msg.getQuotedMessage();
-                        const media = await mensajeConFoto.downloadMedia();
-                        if (media) {
-                            await chat.sendMessage(media, {
-                                sendMediaAsSticker: true,
-                                stickerName: "KORI BOT 🤖",
-                                stickerAuthor: "DEYVI A.O.C ✨"
-                            });
-                        }
-                    } catch (e) {
-                        await msg.reply('❌ Error al crear sticker.');
-                    }
-                } else {
-                    await msg.reply('❌ Responde a una foto con *.s*');
+                        const m = msg.hasMedia ? msg : await msg.getQuotedMessage();
+                        const media = await m.downloadMedia();
+                        await chat.sendMessage(media, { sendMediaAsSticker: true, stickerName: "KORI SUB-BOT", stickerAuthor: "DEYVI AOC" });
+                    } catch (e) { await msg.reply('❌ Error al procesar imagen.'); }
                 }
                 break;
 
             default:
                 break;
         }
-    } catch (error) {
-        console.log('Error en comandos:', error);
-    }
+    } catch (error) { console.log('Error crítico general:', error); }
 }
 
 module.exports = { ejecutar };
