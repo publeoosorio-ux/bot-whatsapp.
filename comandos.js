@@ -1,16 +1,17 @@
 const { MessageMedia } = require('whatsapp-web.js');
-const { GoogleGenAI } = require('@google/generative-ai');
+// 🛠️ IMPORTACIÓN OFICIAL CORREGIDA:
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const axios = require('axios');
 
-// 🔑 PEGA AQUÍ TU CLAVE API COMPLETA ENTRE LAS COMILLAS (La que empieza con AQ.)
+// 🔑 TU CLAVE API COMPLETA
 const GEMINI_API_KEY = "AQ.Ab8RN6J-5x57rikx5NrolJCHCHnRxkmHK0psnMdo8-0yDAA5yA"; 
 
-// Inicialización corregida del motor de Inteligencia Artificial
+// Inicialización garantizada del motor de Inteligencia Artificial
 let aiModel = null;
 try {
     if (GEMINI_API_KEY && GEMINI_API_KEY !== "PEGA_AQUÍ_TU_API_KEY_DE_GOOGLE") {
-        // Corrección de inicialización oficial para el paquete @google/generative-ai
-        const aiConfig = new GoogleGenAI(GEMINI_API_KEY);
+        // Corrección definitiva del constructor oficial de Google
+        const aiConfig = new GoogleGenerativeAI(GEMINI_API_KEY);
         aiModel = aiConfig.getGenerativeModel({ model: "gemini-1.5-flash" });
     }
 } catch (error) {
