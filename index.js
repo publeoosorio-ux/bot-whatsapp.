@@ -1,11 +1,11 @@
-// Servidor falso para que Railway no apague el bot
+// Servidor para evitar que Railway apague el bot
 const http = require('http');
 const port = process.env.PORT || 3000;
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Bot activo 24/7\n');
 }).listen(port, () => {
-    console.log(`🌍 Servidor de mantener vivo corriendo en puerto ${port}`);
+    console.log(`🌍 Servidor corriendo en puerto ${port}`);
 });
 
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
@@ -13,11 +13,9 @@ const qrcode = require('qrcode-terminal');
 const axios = require('axios');
 
 const startTime = new Date();
-
-// Base de datos temporal para el sistema de juegos RPG (Monedas y Economía)
 const rpgDatabase = {};
 
-// Función auxiliar para obtener o crear el perfil de un usuario en los juegos
+// Función para la economía del juego
 function getProfile(userId, pushname) {
     if (!rpgDatabase[userId]) {
         rpgDatabase[userId] = {
@@ -138,25 +136,26 @@ client.on('message_create', async msg => {
                 break;
 
             case 'play':
-                if (!args.length) return msg.reply('❌ Escribe el nombre de la canción. Ejemplo: `.play Sia Unstoppable`');
+                if (!args.length) {
+                    await msg.reply('❌ Escribe el nombre de la canción. Ejemplo: `.play Sia Unstoppable`');
+                    break;
+                }
                 try {
                     await msg.reply('🎵 Buscando canción y convirtiendo a MP3... Espera un momento.');
-                    
                     const searchRes = await axios.get(`https://deliriusemperor-api.mp3yt.org/api/ytsearch?q=${encodeURIComponent(args.join(' '))}`);
                     if (!searchRes.data || !searchRes.data.data || searchRes.data.data.length === 0) {
-                        return msg.reply('❌ No encontré esa canción en YouTube.');
+                        await msg.reply('❌ No encontré esa canción en YouTube.');
+                        break;
                     }
                     
                     const primerVideoUrl = searchRes.data.data[0].url;
                     const tituloCancion = searchRes.data.data[0].title;
-
                     const downloadRes = await axios.get(`https://deliriusemperor-api.mp3yt.org/api/download/ytmp3?url=${encodeURIComponent(primerVideoUrl)}`);
                     
                     if (downloadRes.data && downloadRes.data.data && downloadRes.data.data.downloadUrl) {
                         const audioUrl = downloadRes.data.data.downloadUrl;
                         const mediaRes = await axios.get(audioUrl, { responseType: 'arraybuffer' });
                         const base64Audio = Buffer.from(mediaRes.data, 'binary').toString('base64');
-                        
                         const mediaFile = new MessageMedia('audio/mp3', base64Audio, `${tituloCancion}.mp3`);
                         await chat.sendMessage(mediaFile, { caption: `🎧 *Aquí tienes tu música:* ${tituloCancion}` });
                     } else {
@@ -178,7 +177,8 @@ client.on('message_create', async msg => {
                 const tiempoActual = Date.now();
                 if (tiempoActual - pWork.lastWork < 300000) {
                     const restante = Math.ceil((300000 - (tiempoActual - pWork.lastWork)) / 1000);
-                    return msg.reply(`⏳ Estás cansado. Espera *${restante} segundos* para volver a trabajar.`);
+                    await msg.reply(`⏳ Estás cansado. Espera *${restante} segundos* para volver a trabajar.`);
+                    break;
                 }
 
                 const ganancias = Math.floor(Math.random() * (400 - 150 + 1)) + 150;
@@ -194,7 +194,6 @@ client.on('message_create', async msg => {
                     pWork.xp = 0;
                     await msg.reply(`🎉 ¡ENHORABUENA! @${sender.id.user} has subido al *Nivel ${pWork.level}*!`);
                 }
-
                 await msg.reply(`💰 Trabajaste como ${trabajoAleatorio}.\nGanaste: *$${ganancias} monedas virtuales* y *+250 XP*.`);
                 break;
 
@@ -202,7 +201,8 @@ client.on('message_create', async msg => {
                 const pDaily = getProfile(userId, username);
                 const ahora = Date.now();
                 if (ahora - pDaily.lastDaily < 86400000) {
-                    return msg.reply('❌ Ya reclamaste tu recompensa diaria hoy. Regresa mañana!');
+                    await msg.reply('❌ Ya reclamaste tu recompensa diaria hoy. Regresa mañana!');
+                    break;
                 }
                 
                 pDaily.coins += 1000;
@@ -213,14 +213,22 @@ client.on('message_create', async msg => {
 
             case 'ruleta':
                 const pRuleta = getProfile(userId, username);
-                if (!args.length || isNaN(args[0])) return msg.reply('❌ Introduce una cantidad válida para apostar. Ejemplo: `.ruleta 200`');
+                if (!args.length || isNaN(args[0])) {
+                    await msg.reply('❌ Introduce una cantidad válida para apostar. Ejemplo: `.ruleta 200`');
+                    break;
+                }
                 
                 const apuesta = parseInt(args[0]);
-                if (apuesta <= 0) return msg.reply('❌ La apuesta debe ser mayor a 0.');
-                if (pRuleta.coins < apuesta) return msg.reply(`❌ No tienes suficientes monedas en tu bolsillo. Saldo actual: $${pRuleta.coins}`);
+                if (apuesta <= 0) {
+                    await msg.reply('❌ La apuesta debe ser mayor a 0.');
+                    break;
+                }
+                if (pRuleta.coins < apuesta) {
+                    await msg.reply(`❌ No tienes suficientes monedas en tu bolsillo. Saldo actual: $${pRuleta.coins}`);
+                    break;
+                }
 
-                const gano = Math.random() >= 0.5;
-                if (gano) {
+                if (Math.random() >= 0.5) {
                     pRuleta.coins += apuesta;
                     await msg.reply(`🎰 *¡RULETA DE CASINO!* 🎰\n──────────────────\n¡Tuviste suerte! Salió ganador. ✨\n*Ganaste:* +$${apuesta} monedas.\n*Saldo actual:* $${pRuleta.coins}`);
                 } else {
@@ -231,8 +239,14 @@ client.on('message_create', async msg => {
 
             case 'aviso':
             case 'viso':
-                if (!chat.isGroup) return msg.reply('❌ Este comando solo funciona en grupos.');
-                if (!isAdmin) return msg.reply('❌ Solo administradores.');
+                if (!chat.isGroup) {
+                    await msg.reply('❌ Este comando solo funciona en grupos.');
+                    break;
+                }
+                if (!isAdmin) {
+                    await msg.reply('❌ Solo administradores.');
+                    break;
+                }
 
                 if (msg.hasQuotedMsg) {
                     const quotedMsg = await msg.getQuotedMessage();
@@ -243,10 +257,10 @@ client.on('message_create', async msg => {
                             const mediaAviso = await quotedMsg.downloadMedia();
                             if (mediaAviso) {
                                 await chat.sendMessage(mediaAviso, { caption: txtAviso });
-                                return;
+                                break;
                             }
                         } catch (err) {
-                            console.log('Error copiando imagen de aviso:', err);
+                            console.log(err);
                         }
                     }
                     await chat.sendMessage(txtAviso);
@@ -270,8 +284,14 @@ client.on('message_create', async msg => {
                 break;
 
             case 'todos':
-                if (!chat.isGroup) return msg.reply('❌ Este comando solo funciona en grupos.');
-                if (!isAdmin) return msg.reply('❌ Solo los administradores pueden usar este comando.');
+                if (!chat.isGroup) {
+                    await msg.reply('❌ Este comando solo funciona en grupos.');
+                    break;
+                }
+                if (!isAdmin) {
+                    await msg.reply('❌ Solo los administradores pueden usar este comando.');
+                    break;
+                }
 
                 const mensajeAdicional = args.join(' ');
                 let infoTexto = `📣 *KORI BOT LOS INVOCA* 📣\n`;
@@ -350,7 +370,7 @@ client.on('message_create', async msg => {
                 break;
 
             case 'admins':
-                if (!chat.isGroup) return;
+                if (!chat.isGroup) break;
                 let txtAdmins = `👑 *CONVOCANDO ADMINISTRADORES:* \n\n`;
                 let mencionesAdmins = [];
                 for (let part of chat.participants) {
@@ -366,8 +386,11 @@ client.on('message_create', async msg => {
                 break;
 
             case 'kick':
-                if (!chat.isGroup) return;
-                if (!isAdmin) return msg.reply('❌ No tienes permisos.');
+                if (!chat.isGroup) break;
+                if (!isAdmin) {
+                    await msg.reply('❌ No tienes permisos.');
+                    break;
+                }
                 if (msg.hasMentioned) {
                     const ment = await msg.getMentions();
                     await chat.removeParticipants([ment[0].id._serialized]);
@@ -379,7 +402,7 @@ client.on('message_create', async msg => {
 
             case 'promote':
             case 'promete':
-                if (!chat.isGroup || !isAdmin) return;
+                if (!chat.isGroup || !isAdmin) break;
                 if (msg.hasMentioned) {
                     const ment = await msg.getMentions();
                     await chat.promoteParticipants([ment[0].id._serialized]);
@@ -388,7 +411,7 @@ client.on('message_create', async msg => {
                 break;
 
             case 'demote':
-                if (!chat.isGroup || !isAdmin) return;
+                if (!chat.isGroup || !isAdmin) break;
                 if (msg.hasMentioned) {
                     const ment = await msg.getMentions();
                     await chat.demoteParticipants([ment[0].id._serialized]);
@@ -397,7 +420,7 @@ client.on('message_create', async msg => {
                 break;
 
             case 'grupo':
-                if (!chat.isGroup || !isAdmin) return;
+                if (!chat.isGroup || !isAdmin) break;
                 if (args[0] === 'abrir') {
                     await chat.setMessagesAdminsOnly(false);
                     await chat.sendMessage('🔓 *El grupo ha sido abierto.* Todos los participantes pueden enviar mensajes.');
@@ -409,7 +432,10 @@ client.on('message_create', async msg => {
 
             case 'ia':
             case 'ai':
-                if (!args.length) return msg.reply('❌ Escribe una pregunta. Ejemplo: `.ia ¿Cómo vuelan los aviones?`');
+                if (!args.length) {
+                    await msg.reply('❌ Escribe una pregunta. Ejemplo: `.ia ¿Cómo vuelan los aviones?`');
+                    break;
+                }
                 try {
                     await msg.reply('🧠 *KORI IA* pensando... dame un momento.');
                     const peticion = await axios.get(`https://deliriusemperor-api.mp3yt.org/api/chatgpt?q=${encodeURIComponent(args.join(' '))}`);
@@ -424,9 +450,3 @@ client.on('message_create', async msg => {
                 break;
 
             case 'yts':
-                if (!args.length) return msg.reply('❌ Escribe qué quieres buscar en YouTube. Ejemplo: `.yts bad bunny`');
-                try {
-                    await msg.reply('🔍 Buscando videos en YouTube...');
-                    const resYts = await axios.get(`https://deliriusemperor-api.mp3yt.org/api/ytsearch?q=${encodeURIComponent(args.join(' '))}`);
-                    if (resYts.data && resYts.data.data && resYts.data.data.length > 0) {
-                        let resultado
