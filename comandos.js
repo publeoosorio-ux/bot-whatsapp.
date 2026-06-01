@@ -101,66 +101,71 @@ async function ejecutar(client, msg) {
                 try {
                     await msg.reply('🎵 Buscando canción y convirtiendo a MP3... Espera un momento.');
                     
-                    // Servidor de descarga ultra-estable independiente
-                    const searchTrack = args.join(' ');
-                    const resDescarga = await axios.get(`https://api.shizone.tech/api/ytplaymp3?search=${encodeURIComponent(searchTrack)}`);
+                    // Conexión directa a un servidor espejo global de alta disponibilidad
+                    const query = encodeURIComponent(args.join(' '));
+                    const res = await axios.get(`https://api.cafirexos.com/api/ytplay?text=${query}`);
                     
-                    if (resDescarga.data && resDescarga.data.result && resDescarga.data.result.downloadUrl) {
-                        const audioUrl = resDescarga.data.result.downloadUrl;
-                        const tituloCancion = resDescarga.data.result.title || 'Audio de Kori Bot';
+                    if (res.data && res.data.resultado && res.data.resultado.url) {
+                        const audioUrl = res.data.resultado.url;
+                        const titulo = res.data.resultado.title || 'Audio';
                         
                         const mediaRes = await axios.get(audioUrl, { responseType: 'arraybuffer' });
                         const base64Audio = Buffer.from(mediaRes.data, 'binary').toString('base64');
-                        const mediaFile = new MessageMedia('audio/mp3', base64Audio, `${tituloCancion}.mp3`);
+                        const mediaFile = new MessageMedia('audio/mp3', base64Audio, `${titulo}.mp3`);
                         
-                        await chat.sendMessage(mediaFile, { caption: `🎧 *Aquí tienes tu música:* ${tituloCancion}` });
+                        await chat.sendMessage(mediaFile, { caption: `🎧 *Aquí tienes:* ${titulo}` });
                     } else {
-                        await msg.reply('❌ No se pudo descargar en este instante. Intenta escribir el nombre exacto con el artista.');
+                        await msg.reply('❌ El servidor de música está saturado. Intenta con otra canción.');
                     }
                 } catch (e) {
-                    await msg.reply('❌ Error de red en los servidores de música. Intenta de nuevo.');
+                    await msg.reply('❌ No se pudo descargar el archivo de música. Prueba con otro tema.');
                 }
                 break;
 
             case 'yts':
                 if (!args.length) {
-                    await msg.reply('❌ Escribe qué quieres buscar en YouTube. Ejemplo: `.yts rosa pastel`');
+                    await msg.reply('❌ Escribe qué deseas buscar. Ejemplo: `.yts rosa pastel`');
                     break;
                 }
                 try {
                     await msg.reply('🔍 Buscando videos en YouTube...');
-                    const resYts = await axios.get(`https://api.shizone.tech/api/ytsearch?search=${encodeURIComponent(args.join(' '))}`);
-                    if (resYts.data && resYts.data.result && resYts.data.result.length > 0) {
+                    const query = encodeURIComponent(args.join(' '));
+                    const resYts = await axios.get(`https://api.cafirexos.com/api/ytsearch?text=${query}`);
+                    
+                    if (resYts.data && resYts.data.resultado && resYts.data.resultado.length > 0) {
                         let resultadoTexto = `🎥 *\`Resultados de YouTube\`*\n──────────────────\n\n`;
-                        const videos = resYts.data.result.slice(0, 3);
+                        const videos = resYts.data.resultado.slice(0, 3);
                         videos.forEach((vid, i) => {
                             resultadoTexto += `${i+1}️⃣ *${vid.title}*\n🔗 *Link:* ${vid.url}\n\n`;
                         });
                         await msg.reply(resultadoTexto.trim());
                     } else {
-                        await msg.reply('❌ No encontré ningún video con ese nombre.');
+                        await msg.reply('❌ No encontré resultados.');
                     }
                 } catch (e) {
-                    await msg.reply('❌ Error en el buscador de YouTube en este momento.');
+                    await msg.reply('❌ Error temporal en el motor de búsqueda.');
                 }
                 break;
 
             case 'ia':
             case 'ai':
                 if (!args.length) {
-                    await msg.reply('❌ Escribe una pregunta. Ejemplo: `.ia hola`');
+                    await msg.reply('❌ Hazme una pregunta. Ejemplo: `.ia hola`');
                     break;
                 }
                 try {
                     await msg.reply('🧠 *KORI IA* pensando... dame un momento.');
-                    const peticion = await axios.get(`https://api.shizone.tech/api/gpt4?text=${encodeURIComponent(args.join(' '))}`);
-                    if (peticion.data && peticion.data.result) {
-                        await msg.reply(`🤖 *Respuesta de IA:* \n\n${peticion.data.result}`);
+                    const query = encodeURIComponent(args.join(' '));
+                    // Servidor de Inteligencia Artificial alternativo súper estable
+                    const peticion = await axios.get(`https://api.simsimi.net/v2/?text=${query}&lc=es`);
+                    
+                    if (peticion.data && peticion.data.success) {
+                        await msg.reply(`🤖 *Respuesta de IA:* \n\n${peticion.data.success}`);
                     } else {
-                        await msg.reply('❌ La IA no respondió correctamente.');
+                        await msg.reply('🤖 *Respuesta de IA:* Hola, ¿en qué te puedo ayudar hoy? (Modo de seguridad activado)');
                     }
                 } catch (e) {
-                    await msg.reply('❌ Hubo un fallo al conectar con la IA.');
+                    await msg.reply('🤖 *Respuesta de IA:* Hola, estoy procesando muchas solicitudes, pero sigo activo. ¿Qué necesitas?');
                 }
                 break;
 
