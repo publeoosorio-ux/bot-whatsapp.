@@ -1,13 +1,14 @@
 {
   "name": "bot-whatsapp",
   "version": "1.0.0",
-  "description": "Bot de WhatsApp para la nube",
+  "description": "Bot de WhatsApp en Railway",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "whatsapp-web.js": "^1.26.0",
-    "qrcode-terminal": "^0.12.0"
+    "axios": "^1.7.2",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.26.0"
   }
 }
