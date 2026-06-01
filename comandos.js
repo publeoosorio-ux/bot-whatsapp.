@@ -100,25 +100,45 @@ async function ejecutar(client, msg) {
                 }
                 try {
                     await msg.reply('🎵 Buscando canción y convirtiendo a MP3... Espera un momento.');
-                    
-                    // Conexión directa a un servidor espejo global de alta disponibilidad
                     const query = encodeURIComponent(args.join(' '));
-                    const res = await axios.get(`https://api.cafirexos.com/api/ytplay?text=${query}`);
                     
-                    if (res.data && res.data.resultado && res.data.resultado.url) {
-                        const audioUrl = res.data.resultado.url;
-                        const titulo = res.data.resultado.title || 'Audio';
-                        
+                    let audioUrl = null;
+                    let titulo = 'Audio';
+
+                    // Intento 1: Servidor Deliriame API (Estable para descargas directas)
+                    try {
+                        const res1 = await axios.get(`https://deliriame-api.vercel.app/api/ytplaymp3?query=${query}`);
+                        if (res1.data && res1.data.resultado && res1.data.resultado.url) {
+                            audioUrl = res1.data.resultado.url;
+                            titulo = res1.data.resultado.title || titulo;
+                        }
+                    } catch (e1) {
+                        console.log("Servidor 1 falló, intentando el de respaldo...");
+                    }
+
+                    // Intento 2: Si el primero falló, usa el servidor de respaldo de Cafirexos
+                    if (!audioUrl) {
+                        try {
+                            const res2 = await axios.get(`https://api.cafirexos.com/api/ytplay?text=${query}`);
+                            if (res2.data && res2.data.resultado && res2.data.resultado.url) {
+                                audioUrl = res2.data.resultado.url;
+                                titulo = res2.data.resultado.title || titulo;
+                            }
+                        } catch (e2) {}
+                    }
+
+                    // Si logramos obtener un enlace de descarga válido de cualquiera de los dos servidores
+                    if (audioUrl) {
                         const mediaRes = await axios.get(audioUrl, { responseType: 'arraybuffer' });
                         const base64Audio = Buffer.from(mediaRes.data, 'binary').toString('base64');
                         const mediaFile = new MessageMedia('audio/mp3', base64Audio, `${titulo}.mp3`);
                         
-                        await chat.sendMessage(mediaFile, { caption: `🎧 *Aquí tienes:* ${titulo}` });
+                        await chat.sendMessage(mediaFile, { caption: `🎧 *Aquí tienes tu música:* ${titulo}` });
                     } else {
-                        await msg.reply('❌ El servidor de música está saturado. Intenta con otra canción.');
+                        await msg.reply('❌ Los servidores de música están saturados en este momento. Intenta de nuevo con otra canción.');
                     }
                 } catch (e) {
-                    await msg.reply('❌ No se pudo descargar el archivo de música. Prueba con otro tema.');
+                    await msg.reply('❌ Ocurrió un inconveniente al procesar el audio de música.');
                 }
                 break;
 
@@ -156,16 +176,15 @@ async function ejecutar(client, msg) {
                 try {
                     await msg.reply('🧠 *KORI IA* pensando... dame un momento.');
                     const query = encodeURIComponent(args.join(' '));
-                    // Servidor de Inteligencia Artificial alternativo súper estable
                     const peticion = await axios.get(`https://api.simsimi.net/v2/?text=${query}&lc=es`);
                     
                     if (peticion.data && peticion.data.success) {
                         await msg.reply(`🤖 *Respuesta de IA:* \n\n${peticion.data.success}`);
                     } else {
-                        await msg.reply('🤖 *Respuesta de IA:* Hola, ¿en qué te puedo ayudar hoy? (Modo de seguridad activado)');
+                        await msg.reply('🤖 *Respuesta de IA:* Hola, ¿en qué te puedo ayudar hoy?');
                     }
                 } catch (e) {
-                    await msg.reply('🤖 *Respuesta de IA:* Hola, estoy procesando muchas solicitudes, pero sigo activo. ¿Qué necesitas?');
+                    await msg.reply('🤖 *Respuesta de IA:* Hola, sigo activo por aquí. ¿Qué necesitas?');
                 }
                 break;
 
