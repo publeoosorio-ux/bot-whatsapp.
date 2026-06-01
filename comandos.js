@@ -1,24 +1,10 @@
 const { MessageMedia } = require('whatsapp-web.js');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 const axios = require('axios');
-
-// 🔑 TU CLAVE API INCORPORADA
-const GEMINI_API_KEY = "AQ.Ab8RN6J-5x57rikx5NrolJCHCHnRxkmHK0psnMdo8-0yDAA5yA"; 
-
-// Inicialización del motor de Inteligencia Artificial
-let aiModel = null;
-try {
-    if (GEMINI_API_KEY && GEMINI_API_KEY !== "PEGA_AQUÍ_TU_API_KEY_DE_GOOGLE") {
-        const aiConfig = new GoogleGenerativeAI(GEMINI_API_KEY);
-        aiModel = aiConfig.getGenerativeModel({ model: "gemini-1.5-flash" });
-    }
-} catch (error) {
-    console.log("Error al encender el motor de Gemini:", error);
-}
 
 const startTime = new Date();
 const rpgDatabase = {};
 
+// Base de datos simple para el RPG
 function getProfile(userId, pushname) {
     if (!rpgDatabase[userId]) {
         rpgDatabase[userId] = {
@@ -77,31 +63,29 @@ async function ejecutar(client, msg) {
 🔰 Rol: Novato \`\`\`V\`\`\` ⚔️
 ⏱ Activo: ${hours}:${minutes}:${seconds}
 
-📊 *\`Info & Sistema\`* ╰➤ .owner | .creador | .ping | .uptime | .sistema
+📊 *\`Info & Sistema\`* ╰➤ .owner | .ping | .uptime | .sistema
 
 👥 *\`Gestión de Grupos\`*
 ╰➤ .todos <txt> | .aviso | .admins | .kick @usuario
 ╰➤ .promote @usuario | .demote @usuario | .grupo abrir/cerrar | .reenviar
 
-⬇ *\`Descarga de Música\`*
-╰➤ .play <nombre de canción>
+⬇ *\`Descargas Automáticas\`*
+╰➤ .play <canción> *(Descarga Música MP3)*
+╰➤ .video <nombre> *(Descarga Video MP4)*
 
-💰 *\`Juegos RPG & Economía\`*
-╰➤ .perfil | .work | .daily | .ruleta <cantidad> | .reg | .unreg
+💭 *\`Trilogía de Inteligencia Artificial\`*
+╰➤ .gemini <pregunta> *(Motor Google Gemini)*
+╰➤ .chatgpt <pregunta> *(Motor OpenAI GPT-4)*
+╰➤ .claude <pregunta> *(Motor Anthropic Claude)*
+╰➤ .ia <pregunta> *(Usa la IA más rápida disponible)*
 
-💭 *\`Super Inteligencia\`*
-╰➤ .ia <pregunta> | .ai <pregunta>
+🔍 *\`Búsquedas & Herramientas\`*
+╰➤ .yts <búsqueda> | .s | .sticker | .google <tema>
 
-🔍 *\`Búsquedas\`*
-╰➤ .yts <nombre del video>
+🍯 *\`Diversión, Frases & Utilidades\`*
+╰➤ .consejo | .fraseromantica | .piropo | .chiste | .clima <ciudad> | .dolar
 
-🧰 *\`Herramientas\`*
-╰➤ .s | .sticker *(Responde a una foto)*
-
-🍯 *\`Diversión & Frases\`*
-╰➤ .consejo | .fraseromantica | .piropo
-
-🥧 *\`Free Fire\`*
+🥧 *\`Free Fire Area\`*
 ╰➤ .4vs4 | .66vs6 | .8vs8 | .12vs12 | .sala`;
 
                     await msg.reply(menuTexto);
@@ -116,42 +100,103 @@ async function ejecutar(client, msg) {
                 try {
                     await msg.reply('🎵 Buscando canción y procesando audio... Por favor espera.');
                     const query = encodeURIComponent(args.join(' '));
-                    
-                    // API Alternativa y estable de descargas de música (YTDL)
-                    const res = await axios.get(`https://api.cafirexos.com/api/ytplay?text=${query}`);
-                    
-                    if (res.data && res.data.resultado && res.data.resultado.url) {
-                        const audioUrl = res.data.resultado.url;
-                        const titulo = res.data.resultado.titulo || 'Audio de YouTube';
-                        
+                    const res = await axios.get(`https://api.zenkey.my.id/api/download/ytmp3?query=${query}`);
+                    if (res.data && res.data.result && res.data.result.download_url) {
+                        const audioUrl = res.data.result.download_url;
+                        const titulo = res.data.result.title || 'Audio de Kori Bot';
                         const mediaRes = await axios.get(audioUrl, { responseType: 'arraybuffer' });
                         const base64Audio = Buffer.from(mediaRes.data, 'binary').toString('base64');
                         const mediaFile = new MessageMedia('audio/mp3', base64Audio, `${titulo}.mp3`);
-                        
                         await chat.sendMessage(mediaFile, { caption: `🎧 *Completado:* ${titulo}` });
                     } else {
-                        await msg.reply('❌ No se pudo obtener el archivo de música de este servidor alternativo.');
+                        await msg.reply('❌ No se pudo descargar la canción. Intenta con otro nombre.');
                     }
                 } catch (e) {
-                    console.log(e);
-                    await msg.reply('❌ Error al procesar la descarga de audio. Servidor temporalmente caído.');
+                    await msg.reply('❌ El servidor de música está saturado. Intenta de nuevo en unos minutos.');
+                }
+                break;
+
+            case 'video':
+                if (!args.length) {
+                    await msg.reply('❌ Escribe el nombre del video. Ejemplo: `.video goles de Messi`');
+                    break;
+                }
+                try {
+                    await msg.reply('🎥 Buscando y procesando el video... Por favor espera.');
+                    const query = encodeURIComponent(args.join(' '));
+                    const res = await axios.get(`https://api.zenkey.my.id/api/download/ytmp4?query=${query}`);
+                    if (res.data && res.data.result && res.data.result.download_url) {
+                        const videoUrl = res.data.result.download_url;
+                        const titulo = res.data.result.title || 'Video';
+                        const mediaRes = await axios.get(videoUrl, { responseType: 'arraybuffer' });
+                        const base64Video = Buffer.from(mediaRes.data, 'binary').toString('base64');
+                        const mediaFile = new MessageMedia('video/mp4', base64Video, `${titulo}.mp4`);
+                        await chat.sendMessage(mediaFile, { caption: `🎬 *Aquí tienes:* ${titulo}` });
+                    } else {
+                        await msg.reply('❌ No se pudo obtener el archivo de video.');
+                    }
+                } catch (e) {
+                    await msg.reply('❌ Servidor de video en mantenimiento temporal.');
+                }
+                break;
+                case 'ia':
+            case 'chatgpt':
+                if (!args.length) return msg.reply('❌ Escribe tu consulta. Ejemplo: `.chatgpt cómo se hace un bot`');
+                try {
+                    await msg.reply('🤖 *KORI IA (ChatGPT)* analizando...');
+                    const prompt = encodeURIComponent(args.join(' '));
+                    const res = await axios.get(`https://api.zenkey.my.id/api/ai/chatgpt?prompt=${prompt}`);
+                    if (res.data && res.data.result) {
+                        await msg.reply(`🤖 *Respuesta de ChatGPT:* \n\n${res.data.result}`);
+                    } else {
+                        await msg.reply('❌ Respuesta vacía de ChatGPT, intenta con `.gemini`');
+                    }
+                } catch (err) {
+                    await msg.reply('❌ Error de conexión con ChatGPT. Prueba usando `.gemini` o `.claude`');
+                }
+                break;
+
+            case 'gemini':
+                if (!args.length) return msg.reply('❌ Escribe tu consulta. Ejemplo: `.gemini qué es el sol`');
+                try {
+                    await msg.reply('🧠 *KORI IA (Gemini)* pensando...');
+                    const prompt = encodeURIComponent(args.join(' '));
+                    const res = await axios.get(`https://api.zenkey.my.id/api/ai/gemini?prompt=${prompt}`);
+                    if (res.data && res.data.result) {
+                        await msg.reply(`🤖 *Respuesta de Gemini:* \n\n${res.data.result}`);
+                    } else {
+                        await msg.reply('❌ Error al procesar con Gemini.');
+                    }
+                } catch (err) {
+                    await msg.reply('❌ Los servidores globales de Gemini no respondieron. Intenta con `.chatgpt`');
+                }
+                break;
+
+            case 'claude':
+                if (!args.length) return msg.reply('❌ Escribe tu consulta. Ejemplo: `.claude redacta un ensayo`');
+                try {
+                    await msg.reply('🦅 *KORI IA (Claude)* procesando...');
+                    const prompt = encodeURIComponent(args.join(' '));
+                    const res = await axios.get(`https://api.zenkey.my.id/api/ai/claude?prompt=${prompt}`);
+                    if (res.data && res.data.result) {
+                        await msg.reply(`🤖 *Respuesta de Claude:* \n\n${res.data.result}`);
+                    } else {
+                        await msg.reply('❌ Error al procesar con Claude.');
+                    }
+                } catch (err) {
+                    await msg.reply('❌ Servidor de Claude ocupado. Usa `.chatgpt`');
                 }
                 break;
 
             case 'yts':
-                if (!args.length) {
-                    await msg.reply('❌ Escribe qué deseas buscar. Ejemplo: `.yts rosa pastel`');
-                    break;
-                }
+                if (!args.length) return msg.reply('❌ Escribe qué deseas buscar. Ejemplo: `.yts rap`');
                 try {
                     await msg.reply('🔍 Buscando videos en YouTube...');
                     const query = encodeURIComponent(args.join(' '));
-                    // API Alternativa de búsqueda estable
-                    const resYts = await axios.get(`https://api.cafirexos.com/api/ytsearch?text=${query}`);
-                    
-                    if (resYts.data && resYts.data.resultado && resYts.data.resultado.length > 0) {
+                    const resYts = await axios.get(`https://api.zenkey.my.id/api/search/youtube?query=${query}`);
+                    if (resYts.data && resYts.data.result && resYts.data.result.length > 0) {
                         let resultadoTexto = `🎥 *\`Resultados de YouTube\`*\n──────────────────\n\n`;
-                        const videos = resYts.data.resultado.slice(0, 3);
+                        const videos = resYts.data.result.slice(0, 3);
                         videos.forEach((vid, i) => {
                             resultadoTexto += `${i+1}️⃣ *${vid.title}*\n🔗 *Link:* ${vid.url}\n\n`;
                         });
@@ -160,37 +205,65 @@ async function ejecutar(client, msg) {
                         await msg.reply('❌ No se encontraron videos.');
                     }
                 } catch (e) {
-                    await msg.reply('❌ Error al conectar con el motor de búsqueda de YouTube.');
+                    await msg.reply('❌ Error al conectar con YouTube.');
                 }
                 break;
 
-            case 'ia':
-            case 'ai':
-                if (!args.length) {
-                    await msg.reply('❌ Hazme una pregunta real. Ejemplo: `.ia qué es la fotosíntesis`');
-                    break;
-                }
-                
-                if (!aiModel) {
-                    await msg.reply('⚠️ Gemini no está configurado correctamente.');
-                    break;
-                }
-
+            case 'google':
+                if (!args.length) return msg.reply('❌ ¿Qué quieres buscar en Google? Ejemplo: `.google programación Node.js`');
                 try {
-                    await msg.reply('🧠 *KORI IA (Gemini)* pensando tu respuesta...');
-                    const promptOriginal = args.join(' ');
-                    
-                    const contextoBot = "Actúa como Kori Bot, un asistente de WhatsApp genial, divertido e inteligente creado por DEYVI A.O.C. Responde en español de manera clara a la siguiente duda: ";
-                    
-                    const result = await aiModel.generateContent(contextoBot + promptOriginal);
-                    const response = await result.response;
-                    const text = response.text();
-                    
-                    await msg.reply(`🤖 *Respuesta de IA:* \n\n${text}`);
+                    const query = encodeURIComponent(args.join(' '));
+                    const res = await axios.get(`https://api.zenkey.my.id/api/search/google?query=${query}`);
+                    if (res.data && res.data.result && res.data.result.length > 0) {
+                        let txt = `🔍 *\`Resultados de Google\`*\n──────────────────\n\n`;
+                        res.data.result.slice(0, 3).forEach((r) => {
+                            txt += `🔹 *${r.title}*\n📝 ${r.snippet}\n🔗 _${r.link}_\n\n`;
+                        });
+                        await msg.reply(txt.trim());
+                    } else {
+                        await msg.reply('❌ No se encontraron resultados en la web.');
+                    }
                 } catch (e) {
-                    console.log(e);
-                    await msg.reply('❌ Error interno en los servidores de Gemini o clave inválida. Verifica que copiaste el código completo.');
+                    await msg.reply('❌ Error al conectar con Google.');
                 }
+                break;
+
+            case 'clima':
+                if (!args.length) return msg.reply('❌ Di una ciudad. Ejemplo: `.clima Lima`');
+                try {
+                    const ciudad = encodeURIComponent(args.join(' '));
+                    const res = await axios.get(`https://api.zenkey.my.id/api/tools/weather?location=${ciudad}`);
+                    if (res.data && res.data.result) {
+                        const c = res.data.result;
+                        await msg.reply(`☀️ *\`Clima en ${args.join(' ')}\`*\n──────────────────\n🌡️ *Temperatura:* ${c.temperature || 'N/A'}\n💨 *Viento:* ${c.wind || 'N/A'}\n📝 *Estado:* ${c.description || 'N/A'}`);
+                    } else {
+                        await msg.reply('❌ No se pudo encontrar esa ciudad.');
+                    }
+                } catch (e) {
+                    await msg.reply('❌ Error al consultar el clima.');
+                }
+                break;
+
+            case 'dolar':
+                try {
+                    await msg.reply('💵 Consultando tipo de cambio del mercado financiero...');
+                    const res = await axios.get('https://api.exchangerate-api.com/v4/latest/USD');
+                    if (res.data && res.data.rates) {
+                        const r = res.data.rates;
+                        await msg.reply(`💵 *\`Precio del Dólar Actual\`*\n──────────────────\n🇵🇪 *Perú (PEN):* S/. ${r.PEN.toFixed(2)}\n🇲🇽 *México (MXN):* $${r.MXN.toFixed(2)}\n🇨🇱 *Chile (CLP):* $${r.CLP.toFixed(2)}\n🇦🇷 *Argentina (ARS):* $${r.ARS.toFixed(2)}`);
+                    }
+                } catch (e) {
+                    await msg.reply('❌ Error al obtener cotización.');
+                }
+                break;
+
+            case 'chiste':
+                const chistes = [
+                    "— Papá, papá, ¿qué se siente tener un hijo tan guapo? \n— No sé hijo, pregúntale a tu abuelo. 😂",
+                    "¿Qué hace una abeja en el gimnasio? \n¡Zumba! 🐝",
+                    "¿Por qué los pájaros no usan Facebook? \nPorque ya tienen Twitter. 🐦"
+                ];
+                await msg.reply(`🃏 *Chiste:* \n\n${chistes[Math.floor(Math.random() * chistes.length)]}`);
                 break;
 
             case 'perfil':
@@ -207,60 +280,37 @@ async function ejecutar(client, msg) {
                     await msg.reply(`⏳ Estás cansado. Espera *${restante} segundos* para volver a trabajar.`);
                     break;
                 }
-
                 const ganancias = Math.floor(Math.random() * (400 - 150 + 1)) + 150;
-                const trabajos = ["un minero en Free Fire ⛏️", "un programador de bots 💻", "un repartidor de delivery 🛵", "un cazador de recompensas 🏹"];
-                const trabajoAleatorio = trabajos[Math.floor(Math.random() * trabajos.length)];
-
                 pWork.coins += ganancias;
                 pWork.xp += 250;
                 pWork.lastWork = tiempoActual;
-
-                if (pWork.xp >= 5000) {
-                    pWork.level += 1;
-                    pWork.xp = 0;
-                    await msg.reply(`🎉 ¡ENHORABUENA! @${sender.id.user} has subido al *Nivel ${pWork.level}*!`);
-                }
-                await msg.reply(`💰 Trabajaste como ${trabajoAleatorio}.\nGanaste: *$${ganancias} monedas virtuales* y *+250 XP*.`);
+                await msg.reply(`💰 Trabajaste duro y ganaste *$${ganancias} monedas virtuales* y *+250 XP*.`);
                 break;
 
             case 'daily':
                 const pDaily = getProfile(userId, username);
                 const ahora = Date.now();
                 if (ahora - pDaily.lastDaily < 86400000) {
-                    await msg.reply('❌ Ya reclamaste tu recompensa diaria hoy. Regresa mañana!');
+                    await msg.reply('❌ Ya reclamaste tu recompensa diaria hoy.');
                     break;
                 }
-                
                 pDaily.coins += 1000;
                 pDaily.gems += 5;
                 pDaily.lastDaily = ahora;
-                await msg.reply('🎁 *RECOMPENSA DIARIA* 🎁\n──────────────────\nHas recibido:\n💵 *+$1,000 monedas*\n💎 *+5 Gemas gratis*');
+                await msg.reply('🎁 *RECOMPENSA DIARIA* 🎁\n──────────────────\n💵 *+$1,000 monedas*\n💎 *+5 Gemas gratis*');
                 break;
 
             case 'ruleta':
                 const pRuleta = getProfile(userId, username);
-                if (!args.length || isNaN(args[0])) {
-                    await msg.reply('❌ Introduce una cantidad válida para apostar. Ejemplo: `.ruleta 200`');
-                    break;
-                }
-                
+                if (!args.length || isNaN(args[0])) return msg.reply('❌ Introduce cantidad. Ejemplo: `.ruleta 200`');
                 const apuesta = parseInt(args[0]);
-                if (apuesta <= 0) {
-                    await msg.reply('❌ La apuesta debe ser mayor a 0.');
-                    break;
-                }
-                if (pRuleta.coins < apuesta) {
-                    await msg.reply(`❌ No tienes suficientes monedas en tu bolsillo. Saldo actual: $${pRuleta.coins}`);
-                    break;
-                }
-
+                if (pRuleta.coins < apuesta) return msg.reply('❌ Dinero insuficiente.');
                 if (Math.random() >= 0.5) {
                     pRuleta.coins += apuesta;
-                    await msg.reply(`🎰 *¡RULETA DE CASINO!* 🎰\n──────────────────\n¡Tuviste suerte! Salió ganador. ✨\n*Ganaste:* +$${apuesta} monedas.\n*Saldo actual:* $${pRuleta.coins}`);
+                    await msg.reply(`🎰 *Ganaste:* +$${apuesta} monedas.`);
                 } else {
                     pRuleta.coins -= apuesta;
-                    await msg.reply(`🎰 *¡RULETA DE CASINO!* 🎰\n──────────────────\n¡Mala suerte! La ruleta cayó en color contrario. 💀\n*Perdiste:* -$${apuesta} monedas.\n*Saldo actual:* $${pRuleta.coins}`);
+                    await msg.reply(`🎰 *Perdiste:* -$${apuesta} monedas.`);
                 }
                 break;
 
@@ -272,10 +322,8 @@ async function ejecutar(client, msg) {
                     if (quotedMsg.hasMedia) {
                         try {
                             const mediaAviso = await quotedMsg.downloadMedia();
-                            if (mediaAviso) {
-                                await chat.sendMessage(mediaAviso, { caption: txtAviso });
-                                break;
-                            }
+                            await chat.sendMessage(mediaAviso, { caption: txtAviso });
+                            break;
                         } catch (err) {}
                     }
                     await chat.sendMessage(txtAviso);
@@ -296,11 +344,7 @@ async function ejecutar(client, msg) {
 
             case 'todos':
                 if (!chat.isGroup || !isAdmin) break;
-                const mensajeAdicional = args.join(' ');
-                let infoTexto = `📣 *KORI BOT LOS INVOCA* 📣\n`;
-                if (mensajeAdicional) infoTexto += `📝 *Mensaje:* ${mensajeAdicional}\n`;
-                infoTexto += `────────────────────────────\n`;
-                
+                let infoTexto = `📣 *KORI BOT LOS INVOCA* 📣\n────────────────────────────\n`;
                 let mencionesMiembros = [];
                 for (let participante of chat.participants) {
                     try {
@@ -342,7 +386,7 @@ async function ejecutar(client, msg) {
                 break;
 
             case 'consejo':
-                await msg.reply(`💡 *Consejo:* Revisa bien los espacios al escribir comandos.`);
+                await msg.reply(`💡 *Consejo:* Invierte tus monedas en el comando .ruleta solo cuando te sientas con suerte.`);
                 break;
 
             case 'fraseromantica':
@@ -350,12 +394,12 @@ async function ejecutar(client, msg) {
                 break;
 
             case 'uptime':
-                const uptimeDiff2 = Math.abs(new Date() - startTime);
-                await msg.reply(`⏱️ *Activo:* ${Math.floor(uptimeDiff2 / (1000 * 60 * 60))} horas.`);
+                const uptimeDiff = Math.abs(new Date() - startTime);
+                await msg.reply(`⏱️ *Activo:* ${Math.floor(uptimeDiff / (1000 * 60 * 60))} horas.`);
                 break;
 
             case 'sistema':
-                await msg.reply(`🖥️ *Servidor:* Linux (Railway Cloud)\n📦 *Entorno:* Node.js v22`);
+                await msg.reply(`🖥️ *Servidor:* Linux\n📦 *Entorno:* Node.js v22\n🛠️ *IAs Conectadas:* ChatGPT, Gemini, Claude.`);
                 break;
 
             case 'ping':
