@@ -91,7 +91,8 @@ client.on('message_create', async msg => {
                     const minutes = Math.floor((uptimeDiff % (1000 * 60 * 60)) / (1000 * 60));
                     const seconds = Math.floor((uptimeDiff % (1000 * 60)) / 1000);
 
-                    const menuTexto = `🌐 *\`Menú Principal\`*
+                    // Menú limpio con comandos 100% funcionales
+                    const menuTexto = `🌐 *\`Menú Principal (KORI BOT)\`*
 ────────────────────────────
 👤 Usuario: ${username.toUpperCase()}
 🔰 Rol: Novato \`\`\`V\`\`\` ⚔️
@@ -99,64 +100,52 @@ client.on('message_create', async msg => {
 💎 Gemas: 15
 ⏱ Activo: ${hours}:${minutes}:${seconds}
 
-📊 *\`Info\`* ╰➤ .owner | .creador | .ds | .fixmsgespera | .ping
-╰➤ .botetiquetas | .report | .uptime | .sistema
-╰➤ .sugerencia | .totalf | .horario
+📊 *\`Info & Sistema\`* ╰➤ .owner | .creador | .ping | .uptime | .sistema
 
-⚙ *\`On/Off\`*
-╰➤ .enable opción | .disable opción
-
-⬇ *\`Download\`*
-╰➤ .apk | .audio | .ig | .mediafire | .mega | .pindl
-╰➤ .playstore | .spotify | .tiktok | .ytmp3 | .ytmp4
-╰➤ .deezer | .capcut
-
-🔍 *\`Search\`*
-╰➤ .appstore | .pinterest | .githubsearch | .tiktoksearch
-╰➤ .spotifysearch | .pornhubsearch | .xnxxsearch | .yts
-
-💭 *\`Inteligencias\`*
-╰➤ .aimath | .flux | .ai | .luminai | .polli
+👥 *\`Gestión de Grupos\`*
+╰➤ .todos <txt> | .aviso | .admins | .kick @usuario
+╰➤ .promote @usuario | .demote @usuario | .grupo abrir/cerrar
 
 🥧 *\`Free Fire\`*
 ╰➤ .4vs4 | .6vs6 | .8vs8 | .12vs12 | .sala
 
-🍯 *\`Frases\`*
+🍯 *\`Diversión & Frases\`*
 ╰➤ .consejo | .fraseromantica | .piropo
 
-🪾 *\`Convertidores\`*
-╰➤ .toptt | .toimg | .tovideo
-
-🧰 *\`Tools\`*
-╰➤ .removebg | .cccheck | .font | .hd | .remini | .traductor
-╰➤ .react | .reenviar | .ssweb | .tourl | .whatmusic
-
-👥 *\`Grupos\`*
-╰➤ .add | .admins | .grouptime | .delete | .demote
-╰➤ .encuesta | .aviso | .kick | .link | .mute | .unmute
-╰➤ .promote | .grupo abrir/cerrar | .todos <txt>
-
-💰 *\`RPG\`*
-╰➤ .ruleta | .bank | .pelear | .diamantes | .cofre | .work
-
-📇 *\`Registro\`*
-╰➤ .perfil | .reg | .unreg | .setdesc
-
-⚒ *\`Owner\`*
-╰➤ .addowner | .banchat | .block | .restart | .update`;
+📇 *\`Registro Base\`*
+╰➤ .perfil | .reg | .unreg`;
 
                     await msg.reply(menuTexto);
                 }
                 break;
 
-            // ==========================================
-            // NUEVOS COMANDOS ACTIVADOS (Vistos en tus logs)
-            // ==========================================
+            case 'todos':
+                if (!chat.isGroup) return msg.reply('❌ Este comando solo funciona en grupos.');
+                if (!isAdmin) return msg.reply('❌ Solo los administradores pueden usar este comando.');
 
-            case 'audio':
-            case 'tiktok':
-            case 'ytmp3':
-                await msg.reply('📥 *Función de descarga:* Para activar las descargas reales de música o videos, necesitas instalar la librería `axios` en tu package.json. Por ahora el comando está listo!');
+                const mensajeAdicional = args.join(' ');
+                let infoTexto = `📣 *KORI BOT LOS INVOCA* 📣\n`;
+                if (mensajeAdicional) {
+                    infoTexto += `📝 *Mensaje:* ${mensajeAdicional}\n`;
+                }
+                infoTexto += `────────────────────────────\n`;
+                
+                let mencionesMiembros = [];
+
+                for (let participante of chat.participants) {
+                    try {
+                        const contacto = await client.getContactById(participante.id._serialized);
+                        mencionesMiembros.push(contacto);
+                        // Añade de forma ordenada con el salto de línea y emoji pedido
+                        infoTexto += `💚➪@${participante.id.user}\n`;
+                    } catch (e) {}
+                }
+                await chat.sendMessage(infoTexto.trim(), { mentions: mencionesMiembros });
+                break;
+
+            case 'owner':
+            case 'creador':
+                await msg.reply(`👤 *Creador del Bot:* DEYVI A.O.C\n💬 *Contacto:* Escríbele al +51 900834505 para soporte técnico.`);
                 break;
 
             case 'perfil':
@@ -217,29 +206,8 @@ client.on('message_create', async msg => {
                 await msg.reply(`🖥️ *\`Estado del Servidor\`*\n──────────────────\n💻 *Plataforma:* Linux (Railway Cloud)\n📦 *Entorno:* Node.js v22.2.3\n⚙️ *Estado:* Operando en perfecto estado sin caídas.`);
                 break;
 
-            // ==========================================
-            // COMANDOS DE GRUPO ORIGINALES
-            // ==========================================
-
-            case 'todos':
-                if (!chat.isGroup) return msg.reply('❌ Este comando solo funciona en grupos.');
-                if (!isAdmin) return msg.reply('❌ Solo los administradores pueden usar este comando.');
-
-                let infoTexto = `📢 *MENSAJE GENERAL:* ${args.join(' ')}\n\n`;
-                let mencionesMiembros = [];
-
-                for (let participante of chat.participants) {
-                    try {
-                        const contacto = await client.getContactById(participante.id._serialized);
-                        mencionesMiembros.push(contacto);
-                        infoTexto += `@${participante.id.user} `;
-                    } catch (e) {}
-                }
-                await chat.sendMessage(infoTexto, { mentions: mencionesMiembros });
-                break;
-
             case 'aviso':
-            case 'viso': // Corrección para el error de escritura visto en tu log ".viso"
+            case 'viso':
                 if (!chat.isGroup) return msg.reply('❌ Este comando solo funciona en grupos.');
                 if (!isAdmin) return msg.reply('❌ Solo administradores.');
 
@@ -291,7 +259,7 @@ client.on('message_create', async msg => {
                 break;
 
             case 'promote':
-            case 'promete': // Corrección por si escriben ".promete" por error en el teclado
+            case 'promete':
                 if (!chat.isGroup || !isAdmin) return;
                 if (msg.hasMentioned) {
                     const ment = await msg.getMentions();
@@ -325,11 +293,6 @@ client.on('message_create', async msg => {
                 const reply = await msg.reply('🏓 Midiendo latencia...');
                 const endPing = Date.now();
                 await reply.edit(`🚀 *Pong!* Latencia: ${endPing - startPing}ms`);
-                break;
-
-            case 'owner':
-            case 'creador':
-                await msg.reply(`👤 *Creador del Bot:* KILLTBEST\n💬 *Contacto:* Escríbele al privado para soporte técnico.`);
                 break;
 
             default:
