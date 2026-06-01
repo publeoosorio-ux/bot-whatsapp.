@@ -129,7 +129,7 @@ client.on('message_create', async msg => {
 ╰➤ .consejo | .fraseromantica | .piropo
 
 🥧 *\`Free Fire\`*
-╰➤ .4vs4 | .6vs6 | .8vs8 | .12vs12 | .sala`;
+╰➤ .4vs4 | .66vs6 | .8vs8 | .12vs12 | .sala`;
 
                     await msg.reply(menuTexto);
                 }
@@ -450,3 +450,57 @@ client.on('message_create', async msg => {
                 break;
 
             case 'yts':
+                if (!args.length) {
+                    await msg.reply('❌ Escribe qué quieres buscar en YouTube. Ejemplo: `.yts bad bunny`');
+                    break;
+                }
+                try {
+                    await msg.reply('🔍 Buscando videos en YouTube...');
+                    const resYts = await axios.get(`https://deliriusemperor-api.mp3yt.org/api/ytsearch?q=${encodeURIComponent(args.join(' '))}`);
+                    if (resYts.data && resYts.data.data && resYts.data.data.length > 0) {
+                        let resultadoTexto = `🎥 *\`Resultados de YouTube\`*\n──────────────────\n\n`;
+                        const videos = resYts.data.data.slice(0, 3);
+                        videos.forEach((vid, i) => {
+                            resultadoTexto += `${i+1}️⃣ *${vid.title}*\n⏱️ *Duración:* ${vid.timestamp}\n🔗 *Link:* ${vid.url}\n\n`;
+                        });
+                        await msg.reply(resultadoTexto.trim());
+                    } else {
+                        await msg.reply('❌ No encontré ningún video con ese nombre.');
+                    }
+                } catch (e) {
+                    await msg.reply('❌ Error en el buscador de YouTube.');
+                }
+                break;
+
+            case 's':
+            case 'sticker':
+                if (msg.hasMedia || (msg.hasQuotedMsg && (await msg.getQuotedMessage()).hasMedia)) {
+                    try {
+                        await msg.reply('⏳ *Procesando tu Sticker...*');
+                        const mensajeConFoto = msg.hasMedia ? msg : await msg.getQuotedMessage();
+                        const media = await mensajeConFoto.downloadMedia();
+                        if (media) {
+                            await chat.sendMessage(media, {
+                                sendMediaAsSticker: true,
+                                stickerName: "KORI BOT 🤖",
+                                stickerAuthor: "DEYVI A.O.C ✨"
+                            });
+                        }
+                    } catch (e) {
+                        await msg.reply('❌ No logré transformar esta imagen en Sticker.');
+                    }
+                } else {
+                    await msg.reply('❌ Envía una imagen con el comando *.s* en el comentario, o responde a una foto existente.');
+                }
+                break;
+
+            default:
+                console.log(`Comando ingresado no registrado en switch: .${command}`);
+                break;
+        }
+    } catch (error) {
+        console.log('Error crítico procesando mensaje:', error);
+    }
+});
+
+client.initialize();
