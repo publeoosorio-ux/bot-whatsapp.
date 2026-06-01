@@ -8,7 +8,7 @@ const GEMINI_API_KEY = "AQ.Ab8RN6J-5x57rikx5NrolJCHCHnRxkmHK0psnMdo8-0yDAA5yA";
 // Inicialización corregida del motor de Inteligencia Artificial
 let aiModel = null;
 try {
-    if (GEMINI_API_KEY && GEMINI_API_KEY !== "AQ.Ab8RN6J-5x57rikx5NrolJCHCHnRxkmHK0psnMdo8-0yDAA5yA") {
+    if (GEMINI_API_KEY && GEMINI_API_KEY !== "PEGA_AQUÍ_TU_API_KEY_DE_GOOGLE") {
         // Corrección de inicialización oficial para el paquete @google/generative-ai
         const aiConfig = new GoogleGenAI(GEMINI_API_KEY);
         aiModel = aiConfig.getGenerativeModel({ model: "gemini-1.5-flash" });
