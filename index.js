@@ -22,7 +22,7 @@ function getProfile(userId, pushname) {
     if (!rpgDatabase[userId]) {
         rpgDatabase[userId] = {
             name: pushname || 'Usuario',
-            coins: 500, // Monedas iniciales de regalo
+            coins: 500, 
             bank: 1000,
             gems: 15,
             level: 0,
@@ -130,21 +130,18 @@ client.on('message_create', async msg => {
 🍯 *\`Diversión & Frases\`*
 ╰➤ .consejo | .fraseromantica | .piropo
 
-Free Fire:* ╰➤ .4vs4 | .6vs6 | .8vs8 | .12vs12 | .sala`;
+🥧 *\`Free Fire\`*
+╰➤ .4vs4 | .6vs6 | .8vs8 | .12vs12 | .sala`;
 
                     await msg.reply(menuTexto);
                 }
                 break;
 
-            // ==========================================
-            // ⬇ NUEVO COMANDO: DESCARGA DE AUDIO MP3
-            // ==========================================
             case 'play':
                 if (!args.length) return msg.reply('❌ Escribe el nombre de la canción. Ejemplo: `.play Sia Unstoppable`');
                 try {
                     await msg.reply('🎵 Buscando canción y convirtiendo a MP3... Espera un momento.');
                     
-                    // Buscamos primero el video en la API para obtener el enlace de YouTube
                     const searchRes = await axios.get(`https://deliriusemperor-api.mp3yt.org/api/ytsearch?q=${encodeURIComponent(args.join(' '))}`);
                     if (!searchRes.data || !searchRes.data.data || searchRes.data.data.length === 0) {
                         return msg.reply('❌ No encontré esa canción en YouTube.');
@@ -153,30 +150,23 @@ Free Fire:* ╰➤ .4vs4 | .6vs6 | .8vs8 | .12vs12 | .sala`;
                     const primerVideoUrl = searchRes.data.data[0].url;
                     const tituloCancion = searchRes.data.data[0].title;
 
-                    // Solicitamos la descarga directa de audio a través de la API
                     const downloadRes = await axios.get(`https://deliriusemperor-api.mp3yt.org/api/download/ytmp3?url=${encodeURIComponent(primerVideoUrl)}`);
                     
                     if (downloadRes.data && downloadRes.data.data && downloadRes.data.data.downloadUrl) {
                         const audioUrl = downloadRes.data.data.downloadUrl;
-                        
-                        // Descargamos los datos binarios del archivo para enviarlo a WhatsApp
                         const mediaRes = await axios.get(audioUrl, { responseType: 'arraybuffer' });
                         const base64Audio = Buffer.from(mediaRes.data, 'binary').toString('base64');
                         
                         const mediaFile = new MessageMedia('audio/mp3', base64Audio, `${tituloCancion}.mp3`);
                         await chat.sendMessage(mediaFile, { caption: `🎧 *Aquí tienes tu música:* ${tituloCancion}` });
                     } else {
-                        await msg.reply('❌ No se pudo procesar el audio de este video de forma gratuita en este instante.');
+                        await msg.reply('❌ No se pudo procesar el audio en este instante.');
                     }
                 } catch (e) {
-                    console.log(e);
                     await msg.reply('❌ Error al intentar descargar el audio de música.');
                 }
                 break;
 
-            // ==========================================
-            // 💰 NUEVOS COMANDOS DE JUEGOS Y ECONOMÍA (RPG)
-            // ==========================================
             case 'perfil':
                 const perfil = getProfile(userId, username);
                 await msg.reply(`📇 *\`Tu Perfil Virtual (RPG)\`*\n──────────────────\n👤 *Nombre:* ${perfil.name}\n⚔️ *Rango:* Novato \`\`\`V\`\`\`\n📊 *Progreso:* Nivel ${perfil.level} (${perfil.xp}/5000 XP)\n💎 *Gemas:* ${perfil.gems}\n💰 *Bolsillo:* $${perfil.coins} monedas\n🏦 *Banco Virtual:* $${perfil.bank} monedas`);
@@ -186,7 +176,6 @@ Free Fire:* ╰➤ .4vs4 | .6vs6 | .8vs8 | .12vs12 | .sala`;
             case 'trabajar':
                 const pWork = getProfile(userId, username);
                 const tiempoActual = Date.now();
-                // Cooldown de 5 minutos para trabajar (300000 ms)
                 if (tiempoActual - pWork.lastWork < 300000) {
                     const restante = Math.ceil((300000 - (tiempoActual - pWork.lastWork)) / 1000);
                     return msg.reply(`⏳ Estás cansado. Espera *${restante} segundos* para volver a trabajar.`);
@@ -200,7 +189,6 @@ Free Fire:* ╰➤ .4vs4 | .6vs6 | .8vs8 | .12vs12 | .sala`;
                 pWork.xp += 250;
                 pWork.lastWork = tiempoActual;
 
-                // Subir de nivel automáticamente si llega a 5000 XP
                 if (pWork.xp >= 5000) {
                     pWork.level += 1;
                     pWork.xp = 0;
@@ -213,7 +201,6 @@ Free Fire:* ╰➤ .4vs4 | .6vs6 | .8vs8 | .12vs12 | .sala`;
             case 'daily':
                 const pDaily = getProfile(userId, username);
                 const ahora = Date.now();
-                // Cooldown de 24 horas (86400000 ms)
                 if (ahora - pDaily.lastDaily < 86400000) {
                     return msg.reply('❌ Ya reclamaste tu recompensa diaria hoy. Regresa mañana!');
                 }
@@ -242,9 +229,6 @@ Free Fire:* ╰➤ .4vs4 | .6vs6 | .8vs8 | .12vs12 | .sala`;
                 }
                 break;
 
-            // ==========================================
-            // 📢 COMANDO AVISO MEJORADO (SIN ETIQUETAS REPETITIVAS + IMAGEN COPIADA)
-            // ==========================================
             case 'aviso':
             case 'viso':
                 if (!chat.isGroup) return msg.reply('❌ Este comando solo funciona en grupos.');
@@ -252,14 +236,12 @@ Free Fire:* ╰➤ .4vs4 | .6vs6 | .8vs8 | .12vs12 | .sala`;
 
                 if (msg.hasQuotedMsg) {
                     const quotedMsg = await msg.getQuotedMessage();
-                    let txtAviso = `📢 *\`AVISO IMPORTANTE DE ADM:\`*\n\n${quotedMsg.body || '(Mensaje de multimedia)'}`;
+                    let txtAviso = `📢 *\`AVISO IMPORTANTE DE ADM:\`*\n\n${quotedMsg.body || ''}`;
                     
-                    // Si el mensaje citado tiene imagen/video, lo extrae y lo vuelve a enviar con el diseño
                     if (quotedMsg.hasMedia) {
                         try {
                             const mediaAviso = await quotedMsg.downloadMedia();
                             if (mediaAviso) {
-                                // Se envía la foto con el aviso de pie de página, sin spamear menciones en azul a nadie
                                 await chat.sendMessage(mediaAviso, { caption: txtAviso });
                                 return;
                             }
@@ -267,16 +249,12 @@ Free Fire:* ╰➤ .4vs4 | .6vs6 | .8vs8 | .12vs12 | .sala`;
                             console.log('Error copiando imagen de aviso:', err);
                         }
                     }
-                    // Si no contenía multimedia, envía el texto plano limpio
                     await chat.sendMessage(txtAviso);
                 } else {
                     await msg.reply('❌ Responde a un mensaje escribiendo *.aviso* para duplicarlo como comunicado.');
                 }
                 break;
 
-            // ==========================================
-            // 🔁 NUEVO COMANDO: REENVIAR MENSAJES LIMPIOS
-            // ==========================================
             case 'reenviar':
                 if (msg.hasQuotedMsg) {
                     const quoted = await msg.getQuotedMessage();
@@ -291,9 +269,6 @@ Free Fire:* ╰➤ .4vs4 | .6vs6 | .8vs8 | .12vs12 | .sala`;
                 }
                 break;
 
-            // ==========================================
-            // COMANDOS DE CONTROL DE GRUPO Y GENERALES ANTERIORES
-            // ==========================================
             case 'todos':
                 if (!chat.isGroup) return msg.reply('❌ Este comando solo funciona en grupos.');
                 if (!isAdmin) return msg.reply('❌ Solo los administradores pueden usar este comando.');
@@ -424,4 +399,34 @@ Free Fire:* ╰➤ .4vs4 | .6vs6 | .8vs8 | .12vs12 | .sala`;
             case 'grupo':
                 if (!chat.isGroup || !isAdmin) return;
                 if (args[0] === 'abrir') {
-                    await chat.setMessagesAdminsOn
+                    await chat.setMessagesAdminsOnly(false);
+                    await chat.sendMessage('🔓 *El grupo ha sido abierto.* Todos los participantes pueden enviar mensajes.');
+                } else if (args[0] === 'cerrar') {
+                    await chat.setMessagesAdminsOnly(true);
+                    await chat.sendMessage('🔒 *El grupo ha sido cerrado.* Solo los administradores pueden enviar mensajes.');
+                }
+                break;
+
+            case 'ia':
+            case 'ai':
+                if (!args.length) return msg.reply('❌ Escribe una pregunta. Ejemplo: `.ia ¿Cómo vuelan los aviones?`');
+                try {
+                    await msg.reply('🧠 *KORI IA* pensando... dame un momento.');
+                    const peticion = await axios.get(`https://deliriusemperor-api.mp3yt.org/api/chatgpt?q=${encodeURIComponent(args.join(' '))}`);
+                    if (peticion.data && peticion.data.data) {
+                        await msg.reply(`🤖 *Respuesta de IA:* \n\n${peticion.data.data}`);
+                    } else {
+                        await msg.reply('❌ La IA está saturada en este momento, intenta de nuevo.');
+                    }
+                } catch (e) {
+                    await msg.reply('❌ Hubo un fallo al conectar con la IA gratuita.');
+                }
+                break;
+
+            case 'yts':
+                if (!args.length) return msg.reply('❌ Escribe qué quieres buscar en YouTube. Ejemplo: `.yts bad bunny`');
+                try {
+                    await msg.reply('🔍 Buscando videos en YouTube...');
+                    const resYts = await axios.get(`https://deliriusemperor-api.mp3yt.org/api/ytsearch?q=${encodeURIComponent(args.join(' '))}`);
+                    if (resYts.data && resYts.data.data && resYts.data.data.length > 0) {
+                        let resultado
