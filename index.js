@@ -8,10 +8,31 @@ http.createServer((req, res) => {
     console.log(`🌍 Servidor de mantener vivo corriendo en puerto ${port}`);
 });
 
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
+const axios = require('axios');
 
 const startTime = new Date();
+
+// Base de datos temporal para el sistema de juegos RPG (Monedas y Economía)
+const rpgDatabase = {};
+
+// Función auxiliar para obtener o crear el perfil de un usuario en los juegos
+function getProfile(userId, pushname) {
+    if (!rpgDatabase[userId]) {
+        rpgDatabase[userId] = {
+            name: pushname || 'Usuario',
+            coins: 500, // Monedas iniciales de regalo
+            bank: 1000,
+            gems: 15,
+            level: 0,
+            xp: 0,
+            lastDaily: 0,
+            lastWork: 0
+        };
+    }
+    return rpgDatabase[userId];
+}
 
 const client = new Client({
     authStrategy: new LocalAuth(),
@@ -43,18 +64,6 @@ client.on('ready', () => {
     console.log('¡El Bot está completamente en línea y respondiendo!');
 });
 
-client.on('group_join', async (notification) => {
-    try {
-        const chat = await notification.getChat();
-        const contact = await client.getContactById(notification.recipientIds[0]);
-        await chat.sendMessage(`✨ ¡Bienvenido/a @${contact.id.user} al grupo! ✨\nDisfruta tu estadía. Usa *.bot menú* para ver mis comandos.`, {
-            mentions: [contact]
-        });
-    } catch (e) {
-        console.log('Error en bienvenida:', e);
-    }
-});
-
 client.on('message_create', async msg => {
     try {
         if (!msg.body) return;
@@ -65,7 +74,6 @@ client.on('message_create', async msg => {
         const args = body.slice(1).trim().split(/ +/);
         let command = args.shift().toLowerCase();
 
-        // Atajo directo para el menú
         if (body === '.menu') {
             command = 'bot';
             args[0] = 'menú';
@@ -73,6 +81,7 @@ client.on('message_create', async msg => {
 
         const chat = await msg.getChat();
         const sender = await msg.getContact();
+        const userId = sender.id._serialized;
         const username = sender.pushname || 'Usuario';
         
         let isAdmin = false;
@@ -91,52 +100,214 @@ client.on('message_create', async msg => {
                     const minutes = Math.floor((uptimeDiff % (1000 * 60 * 60)) / (1000 * 60));
                     const seconds = Math.floor((uptimeDiff % (1000 * 60)) / 1000);
 
-                    // Menú limpio con comandos 100% funcionales
                     const menuTexto = `🌐 *\`Menú Principal (KORI BOT)\`*
 ────────────────────────────
 👤 Usuario: ${username.toUpperCase()}
 🔰 Rol: Novato \`\`\`V\`\`\` ⚔️
-📈 Nivel: 0 (110358 XP)
-💎 Gemas: 15
 ⏱ Activo: ${hours}:${minutes}:${seconds}
 
 📊 *\`Info & Sistema\`* ╰➤ .owner | .creador | .ping | .uptime | .sistema
 
 👥 *\`Gestión de Grupos\`*
 ╰➤ .todos <txt> | .aviso | .admins | .kick @usuario
-╰➤ .promote @usuario | .demote @usuario | .grupo abrir/cerrar
+╰➤ .promote @usuario | .demote @usuario | .grupo abrir/cerrar | .reenviar
 
-🥧 *\`Free Fire\`*
-╰➤ .4vs4 | .6vs6 | .8vs8 | .12vs12 | .sala
+⬇ *\`Descarga de Música\`*
+╰➤ .play <nombre de canción>
+
+💰 *\`Juegos RPG & Economía\`*
+╰➤ .perfil | .work | .daily | .ruleta <cantidad> | .reg | .unreg
+
+💭 *\`Super Inteligencia\`*
+╰➤ .ia <pregunta> | .ai <pregunta>
+
+🔍 *\`Búsquedas\`*
+╰➤ .yts <nombre del video>
+
+🧰 *\`Herramientas\`*
+╰➤ .s | .sticker *(Responde a una foto)*
 
 🍯 *\`Diversión & Frases\`*
 ╰➤ .consejo | .fraseromantica | .piropo
 
-📇 *\`Registro Base\`*
-╰➤ .perfil | .reg | .unreg`;
+Free Fire:* ╰➤ .4vs4 | .6vs6 | .8vs8 | .12vs12 | .sala`;
 
                     await msg.reply(menuTexto);
                 }
                 break;
 
+            // ==========================================
+            // ⬇ NUEVO COMANDO: DESCARGA DE AUDIO MP3
+            // ==========================================
+            case 'play':
+                if (!args.length) return msg.reply('❌ Escribe el nombre de la canción. Ejemplo: `.play Sia Unstoppable`');
+                try {
+                    await msg.reply('🎵 Buscando canción y convirtiendo a MP3... Espera un momento.');
+                    
+                    // Buscamos primero el video en la API para obtener el enlace de YouTube
+                    const searchRes = await axios.get(`https://deliriusemperor-api.mp3yt.org/api/ytsearch?q=${encodeURIComponent(args.join(' '))}`);
+                    if (!searchRes.data || !searchRes.data.data || searchRes.data.data.length === 0) {
+                        return msg.reply('❌ No encontré esa canción en YouTube.');
+                    }
+                    
+                    const primerVideoUrl = searchRes.data.data[0].url;
+                    const tituloCancion = searchRes.data.data[0].title;
+
+                    // Solicitamos la descarga directa de audio a través de la API
+                    const downloadRes = await axios.get(`https://deliriusemperor-api.mp3yt.org/api/download/ytmp3?url=${encodeURIComponent(primerVideoUrl)}`);
+                    
+                    if (downloadRes.data && downloadRes.data.data && downloadRes.data.data.downloadUrl) {
+                        const audioUrl = downloadRes.data.data.downloadUrl;
+                        
+                        // Descargamos los datos binarios del archivo para enviarlo a WhatsApp
+                        const mediaRes = await axios.get(audioUrl, { responseType: 'arraybuffer' });
+                        const base64Audio = Buffer.from(mediaRes.data, 'binary').toString('base64');
+                        
+                        const mediaFile = new MessageMedia('audio/mp3', base64Audio, `${tituloCancion}.mp3`);
+                        await chat.sendMessage(mediaFile, { caption: `🎧 *Aquí tienes tu música:* ${tituloCancion}` });
+                    } else {
+                        await msg.reply('❌ No se pudo procesar el audio de este video de forma gratuita en este instante.');
+                    }
+                } catch (e) {
+                    console.log(e);
+                    await msg.reply('❌ Error al intentar descargar el audio de música.');
+                }
+                break;
+
+            // ==========================================
+            // 💰 NUEVOS COMANDOS DE JUEGOS Y ECONOMÍA (RPG)
+            // ==========================================
+            case 'perfil':
+                const perfil = getProfile(userId, username);
+                await msg.reply(`📇 *\`Tu Perfil Virtual (RPG)\`*\n──────────────────\n👤 *Nombre:* ${perfil.name}\n⚔️ *Rango:* Novato \`\`\`V\`\`\`\n📊 *Progreso:* Nivel ${perfil.level} (${perfil.xp}/5000 XP)\n💎 *Gemas:* ${perfil.gems}\n💰 *Bolsillo:* $${perfil.coins} monedas\n🏦 *Banco Virtual:* $${perfil.bank} monedas`);
+                break;
+
+            case 'work':
+            case 'trabajar':
+                const pWork = getProfile(userId, username);
+                const tiempoActual = Date.now();
+                // Cooldown de 5 minutos para trabajar (300000 ms)
+                if (tiempoActual - pWork.lastWork < 300000) {
+                    const restante = Math.ceil((300000 - (tiempoActual - pWork.lastWork)) / 1000);
+                    return msg.reply(`⏳ Estás cansado. Espera *${restante} segundos* para volver a trabajar.`);
+                }
+
+                const ganancias = Math.floor(Math.random() * (400 - 150 + 1)) + 150;
+                const trabajos = ["un minero en Free Fire ⛏️", "un programador de bots 💻", "un repartidor de delivery 🛵", "un cazador de recompensas 🏹"];
+                const trabajoAleatorio = trabajos[Math.floor(Math.random() * trabajos.length)];
+
+                pWork.coins += ganancias;
+                pWork.xp += 250;
+                pWork.lastWork = tiempoActual;
+
+                // Subir de nivel automáticamente si llega a 5000 XP
+                if (pWork.xp >= 5000) {
+                    pWork.level += 1;
+                    pWork.xp = 0;
+                    await msg.reply(`🎉 ¡ENHORABUENA! @${sender.id.user} has subido al *Nivel ${pWork.level}*!`);
+                }
+
+                await msg.reply(`💰 Trabajaste como ${trabajoAleatorio}.\nGanaste: *$${ganancias} monedas virtuales* y *+250 XP*.`);
+                break;
+
+            case 'daily':
+                const pDaily = getProfile(userId, username);
+                const ahora = Date.now();
+                // Cooldown de 24 horas (86400000 ms)
+                if (ahora - pDaily.lastDaily < 86400000) {
+                    return msg.reply('❌ Ya reclamaste tu recompensa diaria hoy. Regresa mañana!');
+                }
+                
+                pDaily.coins += 1000;
+                pDaily.gems += 5;
+                pDaily.lastDaily = ahora;
+                await msg.reply('🎁 *RECOMPENSA DIARIA* 🎁\n──────────────────\nHas recibido:\n💵 *+$1,000 monedas*\n💎 *+5 Gemas gratis*');
+                break;
+
+            case 'ruleta':
+                const pRuleta = getProfile(userId, username);
+                if (!args.length || isNaN(args[0])) return msg.reply('❌ Introduce una cantidad válida para apostar. Ejemplo: `.ruleta 200`');
+                
+                const apuesta = parseInt(args[0]);
+                if (apuesta <= 0) return msg.reply('❌ La apuesta debe ser mayor a 0.');
+                if (pRuleta.coins < apuesta) return msg.reply(`❌ No tienes suficientes monedas en tu bolsillo. Saldo actual: $${pRuleta.coins}`);
+
+                const gano = Math.random() >= 0.5;
+                if (gano) {
+                    pRuleta.coins += apuesta;
+                    await msg.reply(`🎰 *¡RULETA DE CASINO!* 🎰\n──────────────────\n¡Tuviste suerte! Salió ganador. ✨\n*Ganaste:* +$${apuesta} monedas.\n*Saldo actual:* $${pRuleta.coins}`);
+                } else {
+                    pRuleta.coins -= apuesta;
+                    await msg.reply(`🎰 *¡RULETA DE CASINO!* 🎰\n──────────────────\n¡Mala suerte! La ruleta cayó en color contrario. 💀\n*Perdiste:* -$${apuesta} monedas.\n*Saldo actual:* $${pRuleta.coins}`);
+                }
+                break;
+
+            // ==========================================
+            // 📢 COMANDO AVISO MEJORADO (SIN ETIQUETAS REPETITIVAS + IMAGEN COPIADA)
+            // ==========================================
+            case 'aviso':
+            case 'viso':
+                if (!chat.isGroup) return msg.reply('❌ Este comando solo funciona en grupos.');
+                if (!isAdmin) return msg.reply('❌ Solo administradores.');
+
+                if (msg.hasQuotedMsg) {
+                    const quotedMsg = await msg.getQuotedMessage();
+                    let txtAviso = `📢 *\`AVISO IMPORTANTE DE ADM:\`*\n\n${quotedMsg.body || '(Mensaje de multimedia)'}`;
+                    
+                    // Si el mensaje citado tiene imagen/video, lo extrae y lo vuelve a enviar con el diseño
+                    if (quotedMsg.hasMedia) {
+                        try {
+                            const mediaAviso = await quotedMsg.downloadMedia();
+                            if (mediaAviso) {
+                                // Se envía la foto con el aviso de pie de página, sin spamear menciones en azul a nadie
+                                await chat.sendMessage(mediaAviso, { caption: txtAviso });
+                                return;
+                            }
+                        } catch (err) {
+                            console.log('Error copiando imagen de aviso:', err);
+                        }
+                    }
+                    // Si no contenía multimedia, envía el texto plano limpio
+                    await chat.sendMessage(txtAviso);
+                } else {
+                    await msg.reply('❌ Responde a un mensaje escribiendo *.aviso* para duplicarlo como comunicado.');
+                }
+                break;
+
+            // ==========================================
+            // 🔁 NUEVO COMANDO: REENVIAR MENSAJES LIMPIOS
+            // ==========================================
+            case 'reenviar':
+                if (msg.hasQuotedMsg) {
+                    const quoted = await msg.getQuotedMessage();
+                    if (quoted.hasMedia) {
+                        const archivoMedia = await quoted.downloadMedia();
+                        await chat.sendMessage(archivoMedia, { caption: quoted.body || '' });
+                    } else {
+                        await chat.sendMessage(quoted.body);
+                    }
+                } else {
+                    await msg.reply('❌ Responde a un mensaje/imagen con *.reenviar* para volverlo a mandar.');
+                }
+                break;
+
+            // ==========================================
+            // COMANDOS DE CONTROL DE GRUPO Y GENERALES ANTERIORES
+            // ==========================================
             case 'todos':
                 if (!chat.isGroup) return msg.reply('❌ Este comando solo funciona en grupos.');
                 if (!isAdmin) return msg.reply('❌ Solo los administradores pueden usar este comando.');
 
                 const mensajeAdicional = args.join(' ');
                 let infoTexto = `📣 *KORI BOT LOS INVOCA* 📣\n`;
-                if (mensajeAdicional) {
-                    infoTexto += `📝 *Mensaje:* ${mensajeAdicional}\n`;
-                }
+                if (mensajeAdicional) infoTexto += `📝 *Mensaje:* ${mensajeAdicional}\n`;
                 infoTexto += `────────────────────────────\n`;
                 
                 let mencionesMiembros = [];
-
                 for (let participante of chat.participants) {
                     try {
                         const contacto = await client.getContactById(participante.id._serialized);
                         mencionesMiembros.push(contacto);
-                        // Añade de forma ordenada con el salto de línea y emoji pedido
                         infoTexto += `💚➪@${participante.id.user}\n`;
                     } catch (e) {}
                 }
@@ -148,16 +319,12 @@ client.on('message_create', async msg => {
                 await msg.reply(`👤 *Creador del Bot:* DEYVI A.O.C\n💬 *Contacto:* Escríbele al +51 900834505 para soporte técnico.`);
                 break;
 
-            case 'perfil':
-                await msg.reply(`📇 *\`Tu Perfil Virtual\`*\n──────────────────\n👤 *Nombre:* ${username}\n⚔️ *Rango:* Novato \`\`\`V\`\`\`\n📊 *Progreso:* Nivel 0 (0/5000 XP)\n💎 *Gemas:* 15\n💰 *Banco:* $2,500 monedas.`);
-                break;
-
             case 'reg':
-                await msg.reply(`✅ *¡Registro Exitoso!* Hola ${username}, has sido guardado correctamente en la base de datos del bot.`);
+                await msg.reply(`✅ *¡Registro Exitoso!* Hola ${username}, has sido guardado correctamente en el sistema virtual del bot.`);
                 break;
 
             case 'unreg':
-                await msg.reply('❌ *Registro Eliminado:* Tus datos virtuales han sido borrados con éxito del sistema.');
+                await msg.reply('❌ *Registro Eliminado:* Tus datos virtuales han sido borrados con éxito.');
                 break;
 
             case '4vs4':
@@ -177,18 +344,15 @@ client.on('message_create', async msg => {
                     "No es el wifi, es tu sonrisa la que me desconecta del mundo. ✨",
                     "Quisiera ser programador para compilar una vida entera junto a ti. 💻"
                 ];
-                const piropoAleatorio = piropos[Math.floor(Math.random() * piropos.length)];
-                await msg.reply(`🍯 *Piropo del día:* \n\n${piropoAleatorio}`);
+                await msg.reply(`🍯 *Piropo del día:* \n\n${piropos[Math.floor(Math.random() * piropos.length)]}`);
                 break;
 
             case 'consejo':
                 const consejos = [
                     "No cuentes los días, haz que los días cuenten. 😎",
-                    "Si el código no compila a la primera, tómate un café y vuelve a revisar los puntos y comas. ☕",
-                    "No gastes todas tus gemas el primer día, ahorra para los eventos importantes."
+                    "Si el código no compila a la primera, tómate un café y vuelve a revisar los puntos y comas. ☕"
                 ];
-                const consejoAleatorio = consejos[Math.floor(Math.random() * consejos.length)];
-                await msg.reply(`💡 *Consejo del bot:* \n\n${consejoAleatorio}`);
+                await msg.reply(`💡 *Consejo del bot:* \n\n${consejos[Math.floor(Math.random() * consejos.length)]}`);
                 break;
 
             case 'fraseromantica':
@@ -197,43 +361,23 @@ client.on('message_create', async msg => {
 
             case 'uptime':
                 const uptimeDiff = Math.abs(new Date() - startTime);
-                const h = Math.floor(uptimeDiff / (1000 * 60 * 60));
-                const m = Math.floor((uptimeDiff % (1000 * 60 * 60)) / (1000 * 60));
-                await msg.reply(`⏱️ *Tiempo en Línea:* El bot lleva activo de forma ininterrumpida: *${h} horas y ${m} minutos*.`);
+                await msg.reply(`⏱️ *Tiempo en Línea:* El bot lleva activo de forma ininterrumpida: *${Math.floor(uptimeDiff / (1000 * 60 * 60))} horas*.`);
                 break;
 
             case 'sistema':
                 await msg.reply(`🖥️ *\`Estado del Servidor\`*\n──────────────────\n💻 *Plataforma:* Linux (Railway Cloud)\n📦 *Entorno:* Node.js v22.2.3\n⚙️ *Estado:* Operando en perfecto estado sin caídas.`);
                 break;
 
-            case 'aviso':
-            case 'viso':
-                if (!chat.isGroup) return msg.reply('❌ Este comando solo funciona en grupos.');
-                if (!isAdmin) return msg.reply('❌ Solo administradores.');
-
-                if (msg.hasQuotedMsg) {
-                    const quotedMsg = await msg.getQuotedMessage();
-                    let txtAviso = `📢 *\`AVISO IMPORTANTE DE ADM:\`*\n\n${quotedMsg.body}\n\n`;
-                    let mentionsList = [];
-
-                    for (let part of chat.participants) {
-                        try {
-                            const cont = await client.getContactById(part.id._serialized);
-                            mentionsList.push(cont);
-                            txtAviso += `@${part.id.user} `;
-                        } catch (e) {}
-                    }
-                    await chat.sendMessage(txtAviso, { mentions: mentionsList });
-                } else {
-                    await msg.reply('❌ Responde a un mensaje escribiendo *.aviso* para reenviarlo a todos.');
-                }
+            case 'ping':
+                const startPing = Date.now();
+                const reply = await msg.reply('🏓 Midiendo latencia...');
+                await reply.edit(`🚀 *Pong!* Latencia: ${Date.now() - startPing}ms`);
                 break;
 
             case 'admins':
                 if (!chat.isGroup) return;
                 let txtAdmins = `👑 *CONVOCANDO ADMINISTRADORES:* \n\n`;
                 let mencionesAdmins = [];
-
                 for (let part of chat.participants) {
                     if (part.isAdmin || part.isSuperAdmin) {
                         try {
@@ -280,28 +424,4 @@ client.on('message_create', async msg => {
             case 'grupo':
                 if (!chat.isGroup || !isAdmin) return;
                 if (args[0] === 'abrir') {
-                    await chat.setMessagesAdminsOnly(false);
-                    await chat.sendMessage('🔓 *El grupo ha sido abierto.* Todos los participantes pueden enviar mensajes.');
-                } else if (args[0] === 'cerrar') {
-                    await chat.setMessagesAdminsOnly(true);
-                    await chat.sendMessage('🔒 *El grupo ha sido cerrado.* Solo los administradores pueden enviar mensajes.');
-                }
-                break;
-
-            case 'ping':
-                const startPing = Date.now();
-                const reply = await msg.reply('🏓 Midiendo latencia...');
-                const endPing = Date.now();
-                await reply.edit(`🚀 *Pong!* Latencia: ${endPing - startPing}ms`);
-                break;
-
-            default:
-                console.log(`Comando ingresado no registrado en switch: .${command}`);
-                break;
-        }
-    } catch (error) {
-        console.log('Error crítico procesando mensaje:', error);
-    }
-});
-
-client.initialize();
+                    await chat.setMessagesAdminsOn
