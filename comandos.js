@@ -2,15 +2,16 @@ const { MessageMedia } = require('whatsapp-web.js');
 const { GoogleGenAI } = require('@google/generative-ai');
 const axios = require('axios');
 
-// 🔑 BORRA LAS LETRAS DE ABAJO Y PEGA TU CLAVE API ENTRE LAS COMILLAS
+// 🔑 PEGA AQUÍ TU CLAVE API COMPLETA ENTRE LAS COMILLAS (La que empieza con AQ.)
 const GEMINI_API_KEY = "AQ.Ab8RN6J-5x57rikx5NrolJCHCHnRxkmHK0psnMdo8-0yDAA5yA"; 
 
-// Inicialización del motor de Inteligencia Artificial
+// Inicialización corregida del motor de Inteligencia Artificial
 let aiModel = null;
 try {
-    if (GEMINI_API_KEY && GEMINI_API_KEY !== "PEGA_AQUÍ_TU_API_KEY_DE_GOOGLE") {
-        const aiConfig = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-        aiModel = aiConfig.getGenerativeModel({ model: "gemini-pro" });
+    if (GEMINI_API_KEY && GEMINI_API_KEY !== "AQ.Ab8RN6J-5x57rikx5NrolJCHCHnRxkmHK0psnMdo8-0yDAA5yA") {
+        // Corrección de inicialización oficial para el paquete @google/generative-ai
+        const aiConfig = new GoogleGenAI(GEMINI_API_KEY);
+        aiModel = aiConfig.getGenerativeModel({ model: "gemini-1.5-flash" });
     }
 } catch (error) {
     console.log("Error al encender el motor de Gemini:", error);
@@ -170,7 +171,7 @@ async function ejecutar(client, msg) {
                 }
                 
                 if (!aiModel) {
-                    await msg.reply('⚠️ Gemini no está configurado. Asegúrate de pegar tu API Key en la línea 6 del código.');
+                    await msg.reply('⚠️ Gemini no está configurado correctamente. Asegúrate de actualizar el código completo con la nueva versión fija.');
                     break;
                 }
 
@@ -187,7 +188,8 @@ async function ejecutar(client, msg) {
                     
                     await msg.reply(`🤖 *Respuesta de IA:* \n\n${text}`);
                 } catch (e) {
-                    await msg.reply('❌ Error interno en los servidores de Gemini. Revisa si tu clave sigue activa.');
+                    console.log(e);
+                    await msg.reply('❌ Error interno en los servidores de Gemini o clave inválida. Verifica que copiaste el código completo.');
                 }
                 break;
 
@@ -348,8 +350,8 @@ async function ejecutar(client, msg) {
                 break;
 
             case 'uptime':
-                const uptimeDiff = Math.abs(new Date() - startTime);
-                await msg.reply(`⏱️ *Activo:* ${Math.floor(uptimeDiff / (1000 * 60 * 60))} horas.`);
+                const uptimeDiff2 = Math.abs(new Date() - startTime);
+                await msg.reply(`⏱️ *Activo:* ${Math.floor(uptimeDiff2 / (1000 * 60 * 60))} horas.`);
                 break;
 
             case 'sistema':
