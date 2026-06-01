@@ -101,13 +101,13 @@ async function ejecutar(client, msg) {
                 try {
                     await msg.reply('🎵 Buscando canción y convirtiendo a MP3... Espera un momento.');
                     
-                    // Nueva API alternativa súper rápida para descargas
-                    const resUrl = `https://api.vreden.web.id/api/ytmp3?url=${encodeURIComponent(args.join(' '))}`;
-                    const res = await axios.get(resUrl);
+                    // Servidor de descarga ultra-estable independiente
+                    const searchTrack = args.join(' ');
+                    const resDescarga = await axios.get(`https://api.shizone.tech/api/ytplaymp3?search=${encodeURIComponent(searchTrack)}`);
                     
-                    if (res.data && res.data.result && res.data.result.downloadUrl) {
-                        const audioUrl = res.data.result.downloadUrl;
-                        const tituloCancion = res.data.result.title || 'Audio';
+                    if (resDescarga.data && resDescarga.data.result && resDescarga.data.result.downloadUrl) {
+                        const audioUrl = resDescarga.data.result.downloadUrl;
+                        const tituloCancion = resDescarga.data.result.title || 'Audio de Kori Bot';
                         
                         const mediaRes = await axios.get(audioUrl, { responseType: 'arraybuffer' });
                         const base64Audio = Buffer.from(mediaRes.data, 'binary').toString('base64');
@@ -115,21 +115,10 @@ async function ejecutar(client, msg) {
                         
                         await chat.sendMessage(mediaFile, { caption: `🎧 *Aquí tienes tu música:* ${tituloCancion}` });
                     } else {
-                        // Segundo intento si el formato cambia
-                        const resAlt = await axios.get(`https://api.vreden.web.id/api/playmp3?query=${encodeURIComponent(args.join(' '))}`);
-                        if (resAlt.data && resAlt.data.result && resAlt.data.result.downloadUrl) {
-                            const audioUrl = resAlt.data.result.downloadUrl;
-                            const tituloCancion = resAlt.data.result.title || 'Audio';
-                            const mediaRes = await axios.get(audioUrl, { responseType: 'arraybuffer' });
-                            const base64Audio = Buffer.from(mediaRes.data, 'binary').toString('base64');
-                            const mediaFile = new MessageMedia('audio/mp3', base64Audio, `${tituloCancion}.mp3`);
-                            await chat.sendMessage(mediaFile, { caption: `🎧 *Aquí tienes tu música:* ${tituloCancion}` });
-                        } else {
-                            await msg.reply('❌ No se pudo procesar la descarga en este servidor. Intenta con otra canción.');
-                        }
+                        await msg.reply('❌ No se pudo descargar en este instante. Intenta escribir el nombre exacto con el artista.');
                     }
                 } catch (e) {
-                    await msg.reply('❌ Error de red al procesar el audio de música. Intenta de nuevo.');
+                    await msg.reply('❌ Error de red en los servidores de música. Intenta de nuevo.');
                 }
                 break;
 
@@ -140,12 +129,12 @@ async function ejecutar(client, msg) {
                 }
                 try {
                     await msg.reply('🔍 Buscando videos en YouTube...');
-                    const resYts = await axios.get(`https://api.vreden.web.id/api/ytsearch?query=${encodeURIComponent(args.join(' '))}`);
+                    const resYts = await axios.get(`https://api.shizone.tech/api/ytsearch?search=${encodeURIComponent(args.join(' '))}`);
                     if (resYts.data && resYts.data.result && resYts.data.result.length > 0) {
                         let resultadoTexto = `🎥 *\`Resultados de YouTube\`*\n──────────────────\n\n`;
                         const videos = resYts.data.result.slice(0, 3);
                         videos.forEach((vid, i) => {
-                            resultadoTexto += `${i+1}️⃣ *${vid.title}*\n⏱️ *Duración:* ${vid.duration || 'Desconocida'}\n🔗 *Link:* ${vid.url}\n\n`;
+                            resultadoTexto += `${i+1}️⃣ *${vid.title}*\n🔗 *Link:* ${vid.url}\n\n`;
                         });
                         await msg.reply(resultadoTexto.trim());
                     } else {
@@ -164,7 +153,7 @@ async function ejecutar(client, msg) {
                 }
                 try {
                     await msg.reply('🧠 *KORI IA* pensando... dame un momento.');
-                    const peticion = await axios.get(`https://api.vreden.web.id/api/ai/chatgpt?query=${encodeURIComponent(args.join(' '))}`);
+                    const peticion = await axios.get(`https://api.shizone.tech/api/gpt4?text=${encodeURIComponent(args.join(' '))}`);
                     if (peticion.data && peticion.data.result) {
                         await msg.reply(`🤖 *Respuesta de IA:* \n\n${peticion.data.result}`);
                     } else {
