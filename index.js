@@ -47,3 +47,6 @@ client.on('message_create', async msg => {
 });
 
 client.initialize();
+client.on('group_join', async (notification) => {
+    // Aquí puedes disparar el texto estético si la configuración del grupo está en "true"
+});
