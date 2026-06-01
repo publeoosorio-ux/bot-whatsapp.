@@ -1,16 +1,14 @@
 const { MessageMedia } = require('whatsapp-web.js');
-// 🛠️ IMPORTACIÓN OFICIAL CORREGIDA:
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const axios = require('axios');
 
-// 🔑 TU CLAVE API COMPLETA
+// 🔑 TU CLAVE API INCORPORADA
 const GEMINI_API_KEY = "AQ.Ab8RN6J-5x57rikx5NrolJCHCHnRxkmHK0psnMdo8-0yDAA5yA"; 
 
-// Inicialización garantizada del motor de Inteligencia Artificial
+// Inicialización del motor de Inteligencia Artificial
 let aiModel = null;
 try {
     if (GEMINI_API_KEY && GEMINI_API_KEY !== "PEGA_AQUÍ_TU_API_KEY_DE_GOOGLE") {
-        // Corrección definitiva del constructor oficial de Google
         const aiConfig = new GoogleGenerativeAI(GEMINI_API_KEY);
         aiModel = aiConfig.getGenerativeModel({ model: "gemini-1.5-flash" });
     }
@@ -119,12 +117,12 @@ async function ejecutar(client, msg) {
                     await msg.reply('🎵 Buscando canción y procesando audio... Por favor espera.');
                     const query = encodeURIComponent(args.join(' '));
                     
-                    // Servidor de descarga de música de alta fidelidad
-                    const res = await axios.get(`https://api.vreden.web.id/api/ytplay?query=${query}`);
+                    // API Alternativa y estable de descargas de música (YTDL)
+                    const res = await axios.get(`https://api.cafirexos.com/api/ytplay?text=${query}`);
                     
-                    if (res.data && res.data.result && res.data.result.music) {
-                        const audioUrl = res.data.result.music;
-                        const titulo = res.data.result.title || 'Audio de YouTube';
+                    if (res.data && res.data.resultado && res.data.resultado.url) {
+                        const audioUrl = res.data.resultado.url;
+                        const titulo = res.data.resultado.titulo || 'Audio de YouTube';
                         
                         const mediaRes = await axios.get(audioUrl, { responseType: 'arraybuffer' });
                         const base64Audio = Buffer.from(mediaRes.data, 'binary').toString('base64');
@@ -132,10 +130,11 @@ async function ejecutar(client, msg) {
                         
                         await chat.sendMessage(mediaFile, { caption: `🎧 *Completado:* ${titulo}` });
                     } else {
-                        await msg.reply('❌ Servidores de descarga saturados. Intenta de nuevo.');
+                        await msg.reply('❌ No se pudo obtener el archivo de música de este servidor alternativo.');
                     }
                 } catch (e) {
-                    await msg.reply('❌ Error al procesar la descarga de audio.');
+                    console.log(e);
+                    await msg.reply('❌ Error al procesar la descarga de audio. Servidor temporalmente caído.');
                 }
                 break;
 
@@ -147,11 +146,12 @@ async function ejecutar(client, msg) {
                 try {
                     await msg.reply('🔍 Buscando videos en YouTube...');
                     const query = encodeURIComponent(args.join(' '));
-                    const resYts = await axios.get(`https://api.vreden.web.id/api/ytsearch?query=${query}`);
+                    // API Alternativa de búsqueda estable
+                    const resYts = await axios.get(`https://api.cafirexos.com/api/ytsearch?text=${query}`);
                     
-                    if (resYts.data && resYts.data.result && resYts.data.result.length > 0) {
+                    if (resYts.data && resYts.data.resultado && resYts.data.resultado.length > 0) {
                         let resultadoTexto = `🎥 *\`Resultados de YouTube\`*\n──────────────────\n\n`;
-                        const videos = resYts.data.result.slice(0, 3);
+                        const videos = resYts.data.resultado.slice(0, 3);
                         videos.forEach((vid, i) => {
                             resultadoTexto += `${i+1}️⃣ *${vid.title}*\n🔗 *Link:* ${vid.url}\n\n`;
                         });
@@ -160,7 +160,7 @@ async function ejecutar(client, msg) {
                         await msg.reply('❌ No se encontraron videos.');
                     }
                 } catch (e) {
-                    await msg.reply('❌ Error al conectar con YouTube.');
+                    await msg.reply('❌ Error al conectar con el motor de búsqueda de YouTube.');
                 }
                 break;
 
@@ -172,7 +172,7 @@ async function ejecutar(client, msg) {
                 }
                 
                 if (!aiModel) {
-                    await msg.reply('⚠️ Gemini no está configurado correctamente. Asegúrate de actualizar el código completo con la nueva versión fija.');
+                    await msg.reply('⚠️ Gemini no está configurado correctamente.');
                     break;
                 }
 
@@ -180,7 +180,6 @@ async function ejecutar(client, msg) {
                     await msg.reply('🧠 *KORI IA (Gemini)* pensando tu respuesta...');
                     const promptOriginal = args.join(' ');
                     
-                    // Instrucción para que el bot hable amigable como tú quieres
                     const contextoBot = "Actúa como Kori Bot, un asistente de WhatsApp genial, divertido e inteligente creado por DEYVI A.O.C. Responde en español de manera clara a la siguiente duda: ";
                     
                     const result = await aiModel.generateContent(contextoBot + promptOriginal);
