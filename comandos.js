@@ -3,7 +3,7 @@ const { GoogleGenAI } = require('@google/generative-ai');
 const axios = require('axios');
 
 // 🔑 BORRA LAS LETRAS DE ABAJO Y PEGA TU CLAVE API ENTRE LAS COMILLAS
-const GEMINI_API_KEY = "AQ.Ab8RN6LaEkNaFFIhLc1Ezi2TBzvXX_iqB24i3zhYV1Kjw72_aA"; 
+const GEMINI_API_KEY = "AQ.Ab8RN6J-5x57rikx5NrolJCHCHnRxkmHK0psnMdo8-0yDAA5yA"; 
 
 // Inicialización del motor de Inteligencia Artificial
 let aiModel = null;
