@@ -46,6 +46,10 @@ client.on('message_create', async msg => {
     await comandos.ejecutar(client, msg);
 });
 
+// Activador de las bienvenidas y despedidas automáticas con foto
+const { vincularEventosEspeciales } = require('./ejecutar'); 
+vincularEventosEspeciales(client);
+
 client.initialize();
 client.on('group_join', async (notification) => {
     // Aquí puedes disparar el texto estético si la configuración del grupo está en "true"
