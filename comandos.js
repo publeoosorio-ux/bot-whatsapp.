@@ -2,7 +2,7 @@ const { MessageMedia } = require('whatsapp-web.js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const axios = require('axios');
 
-// 🔑 Tu clave API nativa de Gemini (La única IA que se queda porque es directa tuya)
+// 🔑 Tu clave API nativa de Gemini
 const GEMINI_API_KEY = "AQ.Ab8RN6J-5x57rikx5NrolJCHCHnRxkmHK0psnMdo8-0yDAA5yA"; 
 
 let aiModel = null;
@@ -17,7 +17,7 @@ try {
 
 const startTime = new Date();
 const rpgDatabase = {};
-const groupSettings = {};
+const groupSettings = {}; // Aquí se guardan los textos personalizados de bienvenida/despedida de cada grupo
 
 function getProfile(userId, pushname) {
     if (!rpgDatabase[userId]) {
@@ -31,7 +31,12 @@ function getProfile(userId, pushname) {
 
 function getGroupConfig(chatId) {
     if (!groupSettings[chatId]) {
-        groupSettings[chatId] = { welcome: false, bye: false };
+        groupSettings[chatId] = { 
+            welcome: false, 
+            bye: false,
+            welcomeText: "✨ ¡Hola @user! Bienvenido(a) al grupo. Pásala genial y respeta las reglas. 🥳👑",
+            byeText: "👋 Un miembro menos... @user se ha retirado del grupo. ¡Que te vaya bien! ✨"
+        };
     }
     return groupSettings[chatId];
 }
@@ -41,7 +46,6 @@ async function ejecutar(client, msg) {
         if (!msg.body) return;
         const body = msg.body.trim();
         
-        // Soporte para que lea tanto comandos con punto como la palabra aviso de los admins
         if (!body.startsWith('.') && !body.toLowerCase().startsWith('aviso')) return;
 
         let command = '';
@@ -81,7 +85,6 @@ async function ejecutar(client, msg) {
                     const minutes = Math.floor((uptimeDiff % (1000 * 60 * 60)) / (1000 * 60));
                     const seconds = Math.floor((uptimeDiff % (1000 * 60)) / 1000);
 
-                    // 🎨 DISEÑO ULTRA ESTÉTICO Y LIMPIO EN LISTA
                     const menuTexto = `✨ ╔════════════════════════╗ ✨
        👑  *KORI BOT - SYSTEM* ✨ ╚════════════════════════╝ ✨
 
@@ -97,13 +100,15 @@ async function ejecutar(client, msg) {
 🕒 ➪ \`.uptime\` ── Tiempo activo en línea
 💻 ➪ \`.sistema\` ── Detalles del servidor cloud
 
-🛡️ *GESTIÓN DE GRUPOS (ADMINS)*
+🛡️ *GESTIÓN DE GRUPOS & COMPORTAMIENTOS*
 ────────────────────────────
 📣 ➪ \`.todos <txt>\` ── Invocar y mencionar ordenado
 📢 ➪ \`aviso\` ── Reenviar avisos importantes con foto
 🔄 ➪ \`.reenviar\` ── Clonar contenido multimedia
-🚪 ➪ \`.welcome on/off\` ── Activar/Desactivar bienvenidas
-👋 ➪ \`.bye on/off\` ── Activar/Desactivar despedidas
+🚪 ➪ \`.welcome on/off\` ── Interruptor de bienvenida
+📝 ➪ \`.welcome texto <msg>\` ── Personalizar tu bienvenida
+👋 ➪ \`.bye on/off\` ── Interruptor de despedida
+📝 ➪ \`.bye texto <msg>\` ── Personalizar tu despedida
 
 🧠 *INTELIGENCIA ARTIFICIAL (ESTABLE)*
 ────────────────────────────
@@ -127,10 +132,7 @@ async function ejecutar(client, msg) {
 
 🎮 *CAMPAMENTO FREE FIRE AREA*
 ────────────────────────────
-🏆 ➪ \`.4vs4\` ── Organizar versus 4 contra 4
-🏆 ➪ \`.6v6\` ── Organizar versus 6 contra 6
-🏆 ➪ \`.8vs8\` ── Organizar versus 8 contra 8
-🏆 ➪ \`.12vs12\` ── Organizar versus de clanes
+🏆 ➪ \`.4vs4\` | \`.6v6\` | \`.8vs8\` | \`.12vs12\`
 🔑 ➪ \`.sala\` ── Formatear datos para crear Sala
 
 ✨ ─── \`By: DEYVI A.O.C\` ─── ✨`;
@@ -138,15 +140,49 @@ async function ejecutar(client, msg) {
                     await msg.reply(menuTexto);
                 }
                 break;
-                case 'todos':
-                if (!chat.isGroup || !isAdmin) break;
-                // Formato estético y perfectamente ordenado línea por línea
-                let infoTexto = `📣 *CONVOCATORIA GENERAL DE MIEMBROS* 📣\n`;
-                if (args.length > 0) {
-                    infoTexto += `📝 *Motivo:* ${args.join(' ')}\n`;
+                case 'welcome':
+                if (!chat.isGroup || !isAdmin) return msg.reply('❌ Comando exclusivo para Administradores.');
+                const confW = getGroupConfig(chat.id._serialized);
+                if (args[0] === 'on') {
+                    confW.welcome = true;
+                    await msg.reply('✅ *Mensajes de Bienvenida con Foto:* ACTIVADOS.');
+                } else if (args[0] === 'off') {
+                    confW.welcome = false;
+                    await msg.reply('❌ *Mensajes de Bienvenida:* DESACTIVADOS.');
+                } else if (args[0] === 'texto') {
+                    const nuevoTexto = args.slice(1).join(' ');
+                    if (!nuevoTexto) return msg.reply('❌ Escribe el texto.\nEjemplo: `.welcome texto ¡Hola! Bienvenido @user`');
+                    confW.welcomeText = nuevoTexto;
+                    await msg.reply(`📝 *Bienvenida Guardada.*\n\n*Vista previa aproximada:*\n${nuevoTexto.replace('@user', '@' + sender.id.user)}`);
+                } else { 
+                    await msg.reply('💡 *Configuración de Bienvenida:*\n➪ `.welcome on/off` (Encender/Apagar)\n➪ `.welcome texto <Pon aquí tus frases y usa la palabra @user para etiquetarlo>`'); 
                 }
+                break;
+
+            case 'bye':
+                if (!chat.isGroup || !isAdmin) return msg.reply('❌ Comando exclusivo para Administradores.');
+                const confB = getGroupConfig(chat.id._serialized);
+                if (args[0] === 'on') {
+                    confB.bye = true;
+                    await msg.reply('✅ *Mensajes de Despedida con Foto:* ACTIVADOS.');
+                } else if (args[0] === 'off') {
+                    confB.bye = false;
+                    await msg.reply('❌ *Mensajes de Despedida:* DESACTIVADOS.');
+                } else if (args[0] === 'texto') {
+                    const nuevoTexto = args.slice(1).join(' ');
+                    if (!nuevoTexto) return msg.reply('❌ Escribe el texto.\nEjemplo: `.bye texto El usuario @user abandonó la escuadra.`');
+                    confB.byeText = nuevoTexto;
+                    await msg.reply(`📝 *Despedida Guardada.*\n\n*Vista previa aproximada:*\n${nuevoTexto.replace('@user', '@' + sender.id.user)}`);
+                } else { 
+                    await msg.reply('💡 *Configuración de Despedida:*\n➪ `.bye on/off` (Encender/Apagar)\n➪ `.bye texto <Pon aquí tus frases y usa la palabra @user para etiquetarlo>`'); 
+                }
+                break;
+
+            case 'todos':
+                if (!chat.isGroup || !isAdmin) break;
+                let infoTexto = `📣 *CONVOCATORIA GENERAL DE MIEMBROS* 📣\n`;
+                if (args.length > 0) infoTexto += `📝 *Motivo:* ${args.join(' ')}\n`;
                 infoTexto += `────────────────────────────\n\n`;
-                
                 let mencionesMiembros = [];
                 for (let participante of chat.participants) {
                     try {
@@ -160,9 +196,7 @@ async function ejecutar(client, msg) {
 
             case 'aviso':
                 if (!chat.isGroup || !isAdmin) break;
-                // Corrección absoluta del comando aviso: detecta texto propio o citados con multimedia
                 let txtAviso = `📢 *\`AVISO IMPORTANTE DE ADMINISTRACIÓN:\`*\n\n`;
-                
                 if (msg.hasQuotedMsg) {
                     const quotedMsg = await msg.getQuotedMessage();
                     txtAviso += quotedMsg.body || args.join(' ') || '';
@@ -182,38 +216,13 @@ async function ejecutar(client, msg) {
 
             case 'gemini':
                 if (!args.length) return msg.reply('❌ Por favor, escribe tu pregunta para Gemini.');
-                if (!aiModel) return msg.reply('❌ El motor directo de Gemini no está configurado correctamente.');
+                if (!aiModel) return msg.reply('❌ El motor directo de Gemini no está configurado.');
                 try {
                     await msg.reply('🧠 *KORI IA* pensando...');
-                    const prompt = args.join(' ');
-                    const result = await aiModel.generateContent(prompt);
+                    const result = await aiModel.generateContent(args.join(' '));
                     const response = await result.response;
                     await msg.reply(`🤖 *Respuesta de Gemini:* \n\n${response.text()}`);
-                } catch (err) {
-                    await msg.reply('❌ Hubo un inconveniente al procesar con tu clave API de Google.');
-                }
-                break;
-
-            case 'welcome':
-                if (!chat.isGroup || !isAdmin) return msg.reply('❌ Comando exclusivo para Administradores.');
-                if (args[0] === 'on') {
-                    getGroupConfig(chat.id._serialized).welcome = true;
-                    await msg.reply('✅ *Mensajes de Bienvenida:* CONFIGURADOS EN [ON].');
-                } else if (args[0] === 'off') {
-                    getGroupConfig(chat.id._serialized).welcome = false;
-                    await msg.reply('❌ *Mensajes de Bienvenida:* CONFIGURADOS EN [OFF].');
-                } else { await msg.reply('💡 Modo de uso: `.welcome on` o `.welcome off`'); }
-                break;
-
-            case 'bye':
-                if (!chat.isGroup || !isAdmin) return msg.reply('❌ Comando exclusivo para Administradores.');
-                if (args[0] === 'on') {
-                    getGroupConfig(chat.id._serialized).bye = true;
-                    await msg.reply('✅ *Mensajes de Despedida:* CONFIGURADOS EN [ON].');
-                } else if (args[0] === 'off') {
-                    getGroupConfig(chat.id._serialized).bye = false;
-                    await msg.reply('❌ *Mensajes de Despedida:* CONFIGURADOS EN [OFF].');
-                } else { await msg.reply('💡 Modo de uso: `.bye on` o `.bye off`'); }
+                } catch (err) { await msg.reply('❌ Error al procesar con tu clave API de Google.'); }
                 break;
 
             case 'reenviar':
@@ -222,28 +231,20 @@ async function ejecutar(client, msg) {
                     if (quoted.hasMedia) {
                         const archivoMedia = await quoted.downloadMedia();
                         await chat.sendMessage(archivoMedia, { caption: quoted.body || '' });
-                    } else {
-                        await chat.sendMessage(quoted.body);
-                    }
+                    } else { await chat.sendMessage(quoted.body); }
                 }
                 break;
 
             case 'dolar':
                 try {
                     const res = await axios.get('https://api.exchangerate-api.com/v4/latest/USD');
-                    if (res.data && res.data.rates) {
-                        const r = res.data.rates;
-                        await msg.reply(`💵 *\`TIPO DE CAMBIO FINANCIERO\`*\n────────────────────────────\n🇵🇪 *Perú (PEN):* S/. ${r.PEN.toFixed(2)}\n🇲🇽 *México (MXN):* $${r.MXN.toFixed(2)}\n🇨🇱 *Chile (CLP):* $${r.CLP.toFixed(2)}`);
-                    }
-                } catch (e) { await msg.reply('❌ No se pudo consultar la tasa financiera.'); }
+                    const r = res.data.rates;
+                    await msg.reply(`💵 *\`TIPO DE CAMBIO FINANCIERO\`*\n────────────────────────────\n🇵🇪 *Perú (PEN):* S/. ${r.PEN.toFixed(2)}\n🇲🇽 *México (MXN):* $${r.MXN.toFixed(2)}\n🇨🇱 *Chile (CLP):* $${r.CLP.toFixed(2)}`);
+                } catch (e) { await msg.reply('❌ Error al consultar valores.'); }
                 break;
 
             case 'chiste':
-                const chistes = [
-                    "— Papá, papá, ¿qué se siente tener un hijo tan guapo? \n— No sé hijo, pregúntale a tu abuelo. 😂",
-                    "¿Qué hace una abeja en el gimnasio? \n¡Zumba! 🐝",
-                    "¿Por qué los pájaros no usan Facebook? \nPorque ya tienen Twitter. 🐦"
-                ];
+                const chistes = ["— Papá, papá, ¿qué se siente tener un hijo tan guapo? \n— No sé hijo, pregúntale a tu abuelo. 😂", "¿Qué hace una abeja en el gimnasio? \n¡Zumba! 🐝"];
                 await msg.reply(`🃏 *Chiste:* \n\n${chistes[Math.floor(Math.random() * chistes.length)]}`);
                 break;
 
@@ -258,42 +259,31 @@ async function ejecutar(client, msg) {
                 const tiempoActual = Date.now();
                 if (tiempoActual - pWork.lastWork < 300000) {
                     const restante = Math.ceil((300000 - (tiempoActual - pWork.lastWork)) / 1000);
-                    await msg.reply(`⏳ Estás cansado. Espera *${restante} segundos* para volver a trabajar.`);
+                    await msg.reply(`⏳ Espera *${restante} segundos* para volver a trabajar.`);
                     break;
                 }
-                const ganancias = Math.floor(Math.random() * (400 - 150 + 1)) + 150;
-                pWork.coins += ganancias;
-                pWork.lastWork = tiempoActual;
-                await msg.reply(`💰 Trabajaste duro y ganaste *$${ganancias} monedas virtuales*.`);
+                const ganancias = Math.floor(Math.random() * 250) + 150;
+                pWork.coins += ganancias; pWork.lastWork = tiempoActual;
+                await msg.reply(`💰 Ganaste *$${ganancias} monedas virtuales*.`);
                 break;
 
             case 'daily':
                 const pDaily = getProfile(userId, username);
                 const ahora = Date.now();
-                if (ahora - pDaily.lastDaily < 86400000) {
-                    await msg.reply('❌ Ya reclamaste tu recompensa diaria de hoy.');
-                    break;
-                }
-                pDaily.coins += 1000;
-                pDaily.lastDaily = ahora;
+                if (ahora - pDaily.lastDaily < 86400000) return msg.reply('❌ Ya reclamaste tu recompensa diaria.');
+                pDaily.coins += 1000; pDaily.lastDaily = ahora;
                 await msg.reply('🎁 *RECOMPENSA DIARIA* \n────────────────────────────\n💵 *+$1,000 monedas virtuales*');
                 break;
 
             case 'ruleta':
                 const pRuleta = getProfile(userId, username);
-                if (!args.length || isNaN(args[0])) return msg.reply('❌ Introduce una cantidad válida para apostar.');
+                if (!args.length || isNaN(args[0])) return msg.reply('❌ Introduce cantidad.');
                 const apuesta = parseInt(args[0]);
-                if (pRuleta.coins < apuesta) return msg.reply('❌ Saldo insuficiente en tu bolsillo.');
-                if (Math.random() >= 0.5) {
-                    pRuleta.coins += apuesta;
-                    await msg.reply(`🎰 *¡Ganaste de suerte!:* +$${apuesta} monedas.`);
-                } else {
-                    pRuleta.coins -= apuesta;
-                    await msg.reply(`🎰 *Mala jugada, perdiste:* -$${apuesta} monedas.`);
-                }
+                if (pRuleta.coins < apuesta) return msg.reply('❌ Saldo insuficiente.');
+                if (Math.random() >= 0.5) { pRuleta.coins += apuesta; await msg.reply(`🎰 *¡Ganaste!:* +$${apuesta} monedas.`); } 
+                else { pRuleta.coins -= apuesta; await msg.reply(`🎰 *Perdiste:* -$${apuesta} monedas.`); }
                 break;
-
-            case 'owner':
+                case 'owner':
             case 'creador':
                 await msg.reply(`👤 *Creador Oficial:* DEYVI A.O.C\n💬 *Contacto de Soporte:* +51 900834505`);
                 break;
@@ -302,20 +292,19 @@ async function ejecutar(client, msg) {
             case '6vs6':
             case '8vs8':
             case '12vs12':
-                await msg.reply(`🎮 *¡CONVOCATORIA DE FREE FIRE ACTIVA!* 🎮\n────────────────────────────\n\n@everyone ¡Se armó la escuadra para un *${command.toUpperCase()}*! Dejen sus IDs abajo y vayan entrando al juego. 🏆🔥`);
+                await msg.reply(`🎮 *¡CONVOCATORIA DE FREE FIRE ACTIVA!* 🎮\n────────────────────────────\n\n@everyone ¡Se armó la escuadra para un *${command.toUpperCase()}*! Dejen sus IDs abajo y entren. 🏆🔥`);
                 break;
 
             case 'sala':
-                await msg.reply('🔑 ⚔️ *DATOS DE LA SALA DE FREE FIRE* ⚔️\n────────────────────────────\n\n🆔 *ID de la Sala:* Cargando...\n🔒 *Contraseña:* Se enviará por privado.');
+                await msg.reply('🔑 ⚔️ *DATOS DE LA SALA DE FREE FIRE* ⚔️\n🆔 *ID de la Sala:* Cargando...\n🔒 *Contraseña:* Se enviará por privado.');
                 break;
 
             case 'piropo':
-                const piropos = ["¿Acaso eres Google? Porque tienes todo lo que busco. 😏", "No es el wifi, eres tú quien me desconecta. ✨"];
-                await msg.reply(`🍯 *Piropo del Día:* \n\n${piropos[Math.floor(Math.random() * piropos.length)]}`);
+                await msg.reply("🍯 *Piropo del Día:* ¿Acaso eres Google? Porque tienes todo lo que busco. 😏");
                 break;
 
             case 'consejo':
-                await msg.reply(`💡 *Consejo Útil:* Ahorra tus monedas trabajando con \`.trabajar\` antes de arriesgarlas completas en la ruleta.`);
+                await msg.reply("💡 *Consejo Útil:* Ahorra tus monedas trabajando con \`.trabajar\` antes de ir a la ruleta.");
                 break;
 
             case 'fraseromantica':
@@ -324,41 +313,100 @@ async function ejecutar(client, msg) {
 
             case 'uptime':
                 const upDiff = Math.abs(new Date() - startTime);
-                await msg.reply(`⏱️ *Tiempo de Actividad Ininterrumpido:* ${Math.floor(upDiff / (1000 * 60 * 60))} horas.`);
+                await msg.reply(`⏱️ *Activo:* ${Math.floor(upDiff / (1000 * 60 * 60))} horas.`);
                 break;
 
             case 'sistema':
-                await msg.reply(`🖥️ *Arquitectura del Host:* Linux Cloud\n📦 *Entorno:* Node.js Engine v22\n🚀 *Estado de Memoria:* Optimizado (100% Funcional)`);
+                await msg.reply(`🖥️ *Servidor:* Linux Cloud\n📦 *Engine:* Node.js v22\n🚀 *Estado:* Optimizado`);
                 break;
 
             case 'ping':
-                await msg.reply('🚀 *¡Pong!* Kori Bot respondiendo en milisegundos.');
+                await msg.reply('🚀 *¡Pong!* Kori Bot activo.');
                 break;
 
             case 's':
             case 'sticker':
                 if (msg.hasMedia || (msg.hasQuotedMsg && (await msg.getQuotedMessage()).hasMedia)) {
                     try {
-                        await msg.reply('⏳ *Generando Sticker, por favor espera...*');
-                        const mensajeConFoto = msg.hasMedia ? msg : await msg.getQuotedMessage();
-                        const media = await mensajeConFoto.downloadMedia();
+                        await msg.reply('⏳ *Generando Sticker...*');
+                        const m = msg.hasMedia ? msg : await msg.getQuotedMessage();
+                        const media = await m.downloadMedia();
                         if (media) {
                             await chat.sendMessage(media, {
                                 sendMediaAsSticker: true,
-                                stickerName: "KORI SYSTEM 🤖",
-                                stickerAuthor: "DEYVI A.O.C ✨"
+                                stickerName: "KORI SYSTEM 🤖", stickerAuthor: "DEYVI A.O.C ✨"
                             });
                         }
-                    } catch (e) { await msg.reply('❌ No se pudo convertir la imagen a sticker.'); }
-                } else { await msg.reply('❌ Por favor, responde o etiqueta una foto/video con el comando *.s*'); }
+                    } catch (e) { await msg.reply('❌ Error al crear sticker.'); }
+                } else { await msg.reply('❌ Responde a una foto con *.s*'); }
                 break;
 
             default:
                 break;
         }
-    } catch (error) {
-        console.log('Error registrado en consola:', error);
-    }
+    } catch (error) { console.log('Error general:', error); }
 }
 
-module.exports = { ejecutar };
+// 🏠 ========================================================
+// 🚪 DISPARADORES AUTOMÁTICOS DE EVENTOS DE GRUPO (WELCOME & BYE)
+// 🏠 ========================================================
+
+function vincularEventosEspeciales(client) {
+    // 🚪 DETECTOR CUANDO ENTRA ALGUIEN NUEVO
+    client.on('group_join', async (notification) => {
+        try {
+            const chat = await notification.getChat();
+            const contact = await client.getContactById(notification.recipientIds[0]);
+            const config = getGroupConfig(chat.id._serialized);
+
+            if (config.welcome) {
+                let mensajeFinal = config.welcomeText.replace('@user', `@${contact.id.user}`);
+                let fotoMedia;
+
+                try {
+                    // Intenta extraer la foto real de perfil del usuario nuevo
+                    const pfpUrl = await client.getProfilePicUrl(contact.id._serialized);
+                    if (pfpUrl) {
+                        fotoMedia = await MessageMedia.fromUrl(pfpUrl);
+                    }
+                } catch (err) { console.log("Usuario tiene foto privada, usando backup."); }
+
+                // Si no tiene foto de perfil o falló, usa una foto genérica bonita de bienvenida
+                if (!fotoMedia) {
+                    fotoMedia = await MessageMedia.fromUrl("https://i.postimg.cc/FsYfN5vK/welcome-image.jpg").catch(() => null);
+                }
+
+                if (fotoMedia) {
+                    await chat.sendMessage(fotoMedia, { caption: mensajeFinal, mentions: [contact] });
+                } else {
+                    await chat.sendMessage(mensajeFinal, { mentions: [contact] });
+                }
+            }
+        } catch (e) { console.log("Error en evento welcome:", e); }
+    });
+
+    // 🚪 DETECTOR CUANDO ALGUIEN SE SALE O LO SACAN
+    client.on('group_leave', async (notification) => {
+        try {
+            const chat = await notification.getChat();
+            const contact = await client.getContactById(notification.recipientIds[0]);
+            const config = getGroupConfig(chat.id._serialized);
+
+            if (config.bye) {
+                let mensajeFinal = config.byeText.replace('@user', `@${contact.id.user}`);
+                
+                // Carga una imagen descriptiva aleatoria triste de despedida
+                const fotoDespedida = await MessageMedia.fromUrl("https://i.postimg.cc/gJ0pM9qf/bye-image.jpg").catch(() => null);
+
+                if (fotoDespedida) {
+                    await chat.sendMessage(fotoDespedida, { caption: mensajeFinal, mentions: [contact] });
+                } else {
+                    await chat.sendMessage(mensajeFinal, { mentions: [contact] });
+                }
+            }
+        } catch (e) { console.log("Error en evento bye:", e); }
+    });
+}
+
+// Exportamos todo limpio para vincularlo a tu archivo raíz
+module.exports = { ejecutar, vincularEventosEspeciales };
