@@ -159,7 +159,7 @@ async function ejecutar(client, msg) {
                     await msg.reply(menuTexto);
                 }
                 break;
-               case 'kick':
+                case 'kick':
                 if (!chat.isGroup) return msg.reply('❌ Este comando solo sirve en grupos.');
                 if (!isAdmin) return msg.reply('❌ No eres administrador del grupo.');
                 if (msg.mentionedIds.length === 0) return msg.reply('❌ Debes mencionar a la persona que deseas eliminar.');
@@ -207,7 +207,86 @@ async function ejecutar(client, msg) {
                 } catch (err) { await msg.reply('❌ Error de permisos al expulsar.'); }
                 break;
 
-            case 'asegurar':
+            case 'welcome':
+                if (!chat.isGroup) return msg.reply('❌ Este comando solo funciona en grupos.');
+                if (!isAdmin) return msg.reply('❌ Solo los administradores pueden configurar las bienvenidas.');
+                const confW = getGroupConfig(chat.id._serialized);
+                if (args[0] === 'on') { 
+                    confW.welcome = true; 
+                    await msg.reply('✅ *SISTEMA:* Las bienvenidas automáticas con foto han sido *ACTIVADAS* en este grupo.'); 
+                } 
+                else if (args[0] === 'off') { 
+                    confW.welcome = false; 
+                    await msg.reply('❌ *SISTEMA:* Las bienvenidas automáticas han sido *DESACTIVADAS*.'); 
+                } 
+                else if (args[0] === 'texto') {
+                    const nuevoTexto = args.slice(1).join(' ');
+                    if (!nuevoTexto) return msg.reply('❌ Uso correcto: `.welcome texto Hola @user bienvenido`');
+                    confW.welcomeText = nuevoTexto;
+                    await msg.reply('📝 *ÉXITO:* Nuevo texto de bienvenida guardado.');
+                } else { 
+                    await msg.reply('💡 *Modo de uso:* \n• `.welcome on` (Activar)\n• `.welcome off` (Desactivar)\n• `.welcome texto <mensaje>` (Cambiar texto)'); 
+                }
+                break;
+
+            case 'bye':
+                if (!chat.isGroup) return msg.reply('❌ Este comando solo funciona en grupos.');
+                if (!isAdmin) return msg.reply('❌ Solo los administradores pueden configurar las despedidas.');
+                const confB = getGroupConfig(chat.id._serialized);
+                if (args[0] === 'on') { 
+                    confB.bye = true; 
+                    await msg.reply('✅ *SISTEMA:* Las despedidas automáticas han sido *ACTIVADAS*.'); 
+                } 
+                else if (args[0] === 'off') { 
+                    confB.bye = false; 
+                    await msg.reply('❌ *SISTEMA:* Las despedidas automáticas han sido *DESACTIVADAS*.'); 
+                } 
+                else if (args[0] === 'texto') {
+                    const nuevoTexto = args.slice(1).join(' ');
+                    if (!nuevoTexto) return msg.reply('❌ Uso correcto: `.bye texto Adiós @user`');
+                    confB.byeText = nuevoTexto;
+                    await msg.reply('📝 *ÉXITO:* Nuevo texto de despedida guardado.');
+                } else { 
+                    await msg.reply('💡 *Modo de uso:* \n• `.bye on` (Activar)\n• `.bye off` (Desactivar)\n• `.bye texto <mensaje>` (Cambiar texto)'); 
+                }
+                break;
+
+            case 'todos':
+                if (!chat.isGroup || !isAdmin) break;
+                let infoTexto = `📣 *CONVOCATORIA GENERAL DE MIEMBROS* 📣\n`;
+                if (args.length > 0) infoTexto += `📝 *Motivo:* ${args.join(' ')}\n`;
+                infoTexto += `────────────────────────────\n\n`;
+                let mencionesMiembros = [];
+                for (let participante of chat.participants) {
+                    try {
+                        const contacto = await client.getContactById(participante.id._serialized);
+                        mencionesMiembros.push(contacto);
+                        infoTexto += `💚 ➪ @${participante.id.user}\n`;
+                    } catch (e) {}
+                }
+                await chat.sendMessage(infoTexto.trim(), { mentions: mencionesMiembros });
+                break;
+
+            case 'aviso':
+                if (!chat.isGroup || !isAdmin) break;
+                let txtAviso = `📢 *\`AVISO IMPORTANTE DE ADMINISTRACIÓN:\`*\n\n`;
+                if (msg.hasQuotedMsg) {
+                    const quotedMsg = await msg.getQuotedMessage();
+                    txtAviso += quotedMsg.body || args.join(' ') || '';
+                    if (quotedMsg.hasMedia) {
+                        try {
+                            const mediaAviso = await quotedMsg.downloadMedia();
+                            await chat.sendMessage(mediaAviso, { caption: txtAviso });
+                            break;
+                        } catch (err) {}
+                    }
+                } else {
+                    if (!args.length) return msg.reply('❌ Escribe el comunicado del aviso.');
+                    txtAviso += args.join(' ');
+                }
+                await chat.sendMessage(txtAviso);
+                break;
+                case 'asegurar':
                 const userAseg = getProfile(userId, username);
                 if (userAseg.coins < 50) return msg.reply('❌ Necesitas al menos $50 monedas virtuales para pagar el seguro de tu billetera.');
                 userAseg.coins -= 50;
@@ -229,17 +308,15 @@ async function ejecutar(client, msg) {
 
                 if (victima.coins <= 50) return msg.reply('❌ Ese usuario está tan quebrado que no vale la pena robarle.');
                 
-                // Verificar si la cuenta de la víctima tiene activado el seguro
                 if (victima.asegurado) {
-                    victima.asegurado = false; // El escudo se consume tras detener el ataque
+                    victima.asegurado = false; 
                     const multa = 100;
                     ladron.coins = Math.max(0, ladron.coins - multa);
                     return await chat.sendMessage(`🚨 *¡ALARMA DETECTADA!:* @${sender.id.user} intentó robarle a @${victimaCont.id.user}, pero su cuenta estaba súper *ASEGURADA*. El ladrón huyó y pagó una multa de $${multa} monedas.`, { mentions: [sender, victimaCont] });
                 }
 
-                // Probabilidad de éxito del robo (50%)
                 if (Math.random() >= 0.5) {
-                    const robado = Math.floor(Math.random() * (victima.coins * 0.3)) + 20; // Roba hasta el 30%
+                    const robado = Math.floor(Math.random() * (victima.coins * 0.3)) + 20; 
                     victima.coins -= robado;
                     ladron.coins += robado;
                     await chat.sendMessage(`🦹‍♂️ *¡ASALTO EXITOSO!:* @${sender.id.user} fue sigiloso y le robó *$${robado} monedas* a @${victimaCont.id.user}. ¡A las bóvedas! 💸`, { mentions: [sender, victimaCont] });
@@ -277,7 +354,8 @@ async function ejecutar(client, msg) {
                 }
                 await msg.reply(resultadoMsg);
                 break;
-                case 'pelear':
+
+            case 'pelear':
                 if (!chat.isGroup || msg.mentionedIds.length === 0) return msg.reply('❌ Menciona a tu oponente con el comando `.pelear @user`');
                 const retador = getProfile(userId, username);
                 const rivalId = msg.mentionedIds[0];
@@ -336,8 +414,7 @@ async function ejecutar(client, msg) {
                 ];
                 await msg.reply(respuestasBola[Math.floor(Math.random() * respuestasBola.length)]);
                 break;
-
-            case 'crush':
+                case 'crush':
                 if (!chat.isGroup) return msg.reply('❌ Exclusivo para grupos.');
                 const miembros = chat.participants;
                 if (msg.mentionedIds.length === 0) {
@@ -429,7 +506,6 @@ async function ejecutar(client, msg) {
                 else { pRul.coins -= ap; await msg.reply(`🎰 *Perdiste:* -$${ap} monedas.`); }
                 break;
 
-            case 'welcome':
             case 'owner':
             case 'creador':
             case '4vs4':
@@ -443,7 +519,6 @@ async function ejecutar(client, msg) {
             case 'ping':
             case 's':
             case 'sticker':
-                // Estos mapeos de comandos fijos de apoyo se ejecutan orgánicamente o se integran arriba en sus réplicas directas
                 if (command === 'owner' || command === 'creador') await msg.reply(`👤 *Creador:* DEYVI A.O.C\n💬 *Soporte:* +51 900834505`);
                 if (['4vs4','6vs6','8vs8','12vs12'].includes(command)) await msg.reply(`🎮 *¡FREE FIRE ACTIVO!* \n@everyone ¡Se armó un *${command.toUpperCase()}*! Dejen IDs. 🏆🔥`);
                 if (command === 'sala') await msg.reply('🔑 *SALA DE FREE FIRE* \n🆔 *ID:* Cargando...\n🔒 *Pass:* Por privado.');
