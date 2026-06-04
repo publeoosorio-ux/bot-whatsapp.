@@ -46,8 +46,11 @@ client.on('message_create', async msg => {
     await comandos.ejecutar(client, msg);
 });
 
-// Activador de las bienvenidas y despedidas automáticas con foto
-const { vincularEventosEspeciales } = require('./comandos'); 
-vincularEventosEspeciales(client);
+// Activador de las bienvenidas y despedidas automáticas desde comandos.js
+try {
+    comandos.vincularEventosEspeciales(client);
+} catch (e) {
+    console.log("Error al vincular eventos especiales:", e);
+}
 
 client.initialize();
