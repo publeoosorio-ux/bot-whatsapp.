@@ -10,12 +10,7 @@ http.createServer((req, res) => {
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
-const mongoose = require('mongoose'); // 🔌 NUEVO: Motor de base de datos integrado
 const comandos = require('./comandos.js');
-
-// 🔌 CONEXIÓN PERMANENTE CON MONGODB ATLAS
-// Reemplaza esto con tu URL de conexión real que obtuviste de tu cluster de MongoDB Atlas.
-const MONGO_URI = process.env.MONGO_URI || "TU_URL_DE_CONEXION_DE_MONGODB_ATLAS";
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log("🔌 Conectado con éxito a MongoDB Atlas (Base de datos blindada) 🟢"))
