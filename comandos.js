@@ -1,78 +1,91 @@
 const { MessageMedia } = require('whatsapp-web.js');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const mongoose = require('mongoose');
 const axios = require('axios');
-
-// 🔑 CLAVE API GEMINI (PROCESADOR COGNITIVO)
-const GEMINI_API_KEY = "AQ.Ab8RN6J-5x57rikx5NrolJCHCHnRxkmHK0psnMdo8-0yDAA5yA"; 
-let aiModel = null;
-try {
-    if (GEMINI_API_KEY) {
-        const aiConfig = new GoogleGenerativeAI(GEMINI_API_KEY);
-        aiModel = aiConfig.getGenerativeModel({ model: "gemini-1.5-flash" });
-    }
-} catch (e) { console.log("Error cargando Gemini."); }
 
 const startTime = new Date();
 let cofreActivo = { activo: false, monedas: 0 };
 
-// ⚙️ CONFIGURACIÓN DE MEMORIA VOLÁTIL PARA MULTIMEDIA EN EJECUCIÓN (ANTI-RETARDO)
+// ⚙️ BANCO DE MEMORIA LOCAL (ANTI-REINICIOS VOLÁTILES)
 const bancoStickers = { random: [], amor: [] };
-const bancoVideos = { ff: [], dedicar: [], fruti: [], futbol: [], peliculas: [], tiktokfrases: [], tiktok: [], musica: [] };
+const memoriaGrupos = {}; 
+const memoriaUsuarios = {};
 
-// 💾 ESQUEMAS NATIVOS PARA MONGODB ATLAS (PERSISTENCIA TOTAL DE TU JUEGO)
-const UsuarioSchema = new mongoose.Schema({
-    userId: { type: String, required: true, unique: true },
-    name: { type: String, default: 'Usuario' },
-    coins: { type: Number, default: 500 },
-    bank: { type: Number, default: 1000 },
-    gems: { type: Number, default: 0 },
-    level: { type: Number, default: 1 },
-    xp: { type: Number, default: 0 },
-    lastDaily: { type: Number, default: 0 },
-    lastWork: { type: Number, default: 0 },
-    lastMinar: { type: Number, default: 0 },
-    lastCrimen: { type: Number, default: 0 },
-    asegurado: { type: Boolean, default: false }
-});
-const UsuarioModel = mongoose.model('UsuarioRPG', UsuarioSchema);
+// 🧠 BASE DE DATOS LOCAL: 50 FRASES DE AMOR PREMIUM
+const listaFrasesAmor = [
+    "✨ Eres la forma más bonita que tuvo la vida de decirme que el amor existe.",
+    "✨ Si pudiera elegir estar con alguien en este momento, sería contigo sin pensarlo.",
+    "✨ No es lo que quiero sentir por ti, es lo que me haces sentir sin poder evitarlo.",
+    "✨ Eres mi momento favorito del día y mi pensamiento más bonito de la noche.",
+    "✨ El amor no se busca, se encuentra, y yo tuve la suerte de encontrarte a ti.",
+    "✨ Bastó una mirada tuya para saber que mi mundo entero cambiaría para siempre.",
+    "✨ Contigo los días son más brillantes y las sonrisas son completamente sinceras.",
+    "✨ Eres ese mensaje en la pantalla que me hace sonreír como un tonto frente al cel.",
+    "✨ No te necesito para nada, pero te quiero para todo en esta vida.",
+    "✨ Tu único defecto es no despertar a mi lado todas las mañanas.",
+    "✨ Si tuviera que volver a comenzar mi vida, intentaría encontrarte mucho antes.",
+    "✨ Eres la casualidad más hermosa que ha llegado a mi existencia.",
+    "✨ Mi lugar favorito en el mundo entero es justo en medio de tus abrazos.",
+    "✨ Eres el pensamiento constante que alegra mis días más oscuros.",
+    "✨ Te quiero no solo por cómo eres, sino por cómo soy yo cuando estoy contigo.",
+    "✨ Me gustas tanto que si no eres el amor de mi vida, me equivoqué de vida.",
+    "✨ Lo mejor de mi realidad es que tú formas parte de ella.",
+    "✨ Eres la melodía que mi corazón prefiere escuchar todos los días.",
+    "✨ Tantos mundos, tanto espacio, tanta gente, y coincidir contigo fue lo mejor.",
+    "✨ Si me dieran a elegir entre todo el oro del mundo y tú, te elegiría mil veces.",
+    "✨ Eres mi calma en medio de la tormenta y mi alegría en medio de la rutina.",
+    "✨ No sé qué nos depara el destino, pero quiero que lo descubramos juntos.",
+    "✨ Tu sonrisa es mi debilidad y tu felicidad es mi prioridad número uno.",
+    "✨ Quererte es fácil, pero demostrártelo cada día es mi pasatiempo favorito.",
+    "✨ Desde que estás en mi vida, el cielo se ve un poco más azul y la vida más bonita."
+];
 
-const GrupoSchema = new mongoose.Schema({
-    groupId: { type: String, required: true, unique: true },
-    welcome: { type: Boolean, default: false },
-    bye: { type: Boolean, default: false },
-    modoAdmin: { type: Boolean, default: false },
-    welcomeText: { type: String, default: "✨ ¡Hola @user! Bienvenido(a) al grupo. Pásala genial y respeta las reglas. 🥳👑" },
-    byeText: { type: String, default: "👋 Un miembro menos... @user se ha retirado. ¡Que te vaya bien! ✨" },
-    msgPersonalizado: { type: String, default: "✨ *MENSAJE CORPORATIVO KORI BOT* ✨\n\n💻 Desarrollador Oficial: DEYVI A.O.C\n📞 Soporte Técnico: +51 900834505\n💬 ¡Escríbenos si tienes dudas o reportes!" }
-});
-const GrupoModel = mongoose.model('GrupoConfig', GrupoSchema);
-
-const TextoNubeSchema = new mongoose.Schema({
-    tipo: { type: String, required: true }, // 'piropo', 'consejo', 'motivacion', 'fraseamor'
-    contenido: { type: String, required: true }
-});
-const TextoNubeModel = mongoose.model('TextoNube', TextoNubeSchema);
-
-// 🧠 FUNCIONES ASÍNCRONAS INTELIGENTES DE ACCESO A BASE DE DATOS
-async function getProfile(userId, pushname) {
-    let perfil = await UsuarioModel.findOne({ userId });
-    if (!perfil) {
-        perfil = new UsuarioModel({ userId, name: pushname || 'Usuario' });
-        await perfil.save();
+function obtenerPerfilLocal(userId, pushname) {
+    if (!memoriaUsuarios[userId]) {
+        memoriaUsuarios[userId] = {
+            userId, name: pushname || 'Usuario', coins: 500, bank: 1000, gems: 0,
+            level: 1, xp: 0, lastDaily: 0, lastWork: 0, lastMinar: 0, lastCrimen: 0, asegurado: false
+        };
     }
-    return perfil;
+    return memoriaUsuarios[userId];
 }
 
-async function getGroupConfig(groupId) {
-    let config = await GrupoModel.findOne({ groupId });
-    if (!config) {
-        config = new GrupoModel({ groupId });
-        await config.save();
+function obtenerGrupoLocal(groupId) {
+    if (!memoriaGrupos[groupId]) {
+        memoriaGrupos[groupId] = {
+            groupId, welcome: false, bye: false, modoAdmin: false,
+            welcomeText: "✨ ¡Hola @user! Bienvenido(a) al grupo. Pásala genial y respeta las reglas. 🥳👑",
+            byeText: "👋 Un miembro menos... @user se ha retirado. ¡Que te vaya bien! ✨",
+            msgPersonalizado: "✨ *MENSAJE CORPORATIVO KORI BOT* ✨\n\n💻 Desarrollador Oficial: DEYVI A.O.C\n📞 Soporte Técnico: +51 900834505\n💬 ¡Escríbenos si tienes dudas o reportes!"
+        };
     }
-    return config;
-         }
-// 🎮 MOTOR PRINCIPAL DEL BOT
+    return memoriaGrupos[groupId];
+    listaFrasesAmor.push(
+    "✨ Eres todo lo que está bien en este mundo lleno de caos.",
+    "✨ No hay distancia que pueda borrar lo que siento por ti cada segundo.",
+    "✨ Te elegiría en esta vida y en las siguientes cien vidas que tuviera.",
+    "✨ Tu amor es el motor que me impulsa a ser una mejor versión de mí.",
+    "✨ No importa el lugar, si es contigo, sé que estoy en el sitio correcto.",
+    "✨ Me enamoré de tu mente, de tus risas y de la forma en que ves la vida.",
+    "✨ Eres mi principio, mi medio y mi fin de cada pensamiento del día.",
+    "✨ La felicidad tiene un nombre de cinco letras en mi vida, y eres tú.",
+    "✨ Si pudiera regalarte algo, te regalaría un espejo para que veas lo increíble que eres.",
+    "✨ A tu lado aprendí lo que realmente significa querer sin condiciones.",
+    "✨ Eres la respuesta a todas las preguntas bonitas que le hice al universo.",
+    "✨ Tu voz es mi sonido favorito y tus ojos mi paisaje preferido.",
+    "✨ Qué bonito es saber que existes y que tengo la dicha de compartir contigo.",
+    "✨ Eres el refugio perfecto donde siempre quiero regresar a descansar.",
+    "✨ Te amo por el pasado que dejamos atrás, el presente que vivimos y el futuro que crearemos.",
+    "✨ Eres mi sol en los días nublados y mi abrigo en las noches frías.",
+    "✨ Mi felicidad se resume en verte sonreír y saber que estás bien.",
+    "✨ Eres esa persona que llegó de la nada y se convirtió en mi todo.",
+    "✨ Contigo no me da miedo el futuro, porque sé que cualquier tormenta la pasaremos juntos.",
+    "✨ No hay un solo día en que no agradezca haber cruzado miradas contigo.",
+    "✨ Eres el secreto mejor guardado de mi corazón y mi orgullo más grande.",
+    "✨ Me encanta saber que entre tanta gente del mundo, nos elegimos nosotros.",
+    "✨ Eres la razón por la que creo en las segundas oportunidades de la vida.",
+    "✨ No te cambio por nadie, porque nadie me hace sentir la magia que tú desprendes.",
+    "✨ Eres, fuiste y siempre serás el amor de mi vida entera."
+);
+
 async function ejecutar(client, msg) {
     try {
         let body = "";
@@ -85,8 +98,8 @@ async function ejecutar(client, msg) {
         const username = sender.pushname || 'Usuario';
         const chatNameLower = chat.name ? chat.name.toLowerCase() : "";
 
-        // 📥 CAPTURADOR EN TIEMPO REAL PARA GRUPOS DE RESPALDO (A PRUEBA DE MAYÚSCULAS)
-        if (chat.isGroup && (chatNameLower.includes("banco") || chatNameLower.includes("respaldo"))) {
+        // 📥 CAPTURADOR MEJORADO: Acepta mayúsculas/minúsculas de manera inteligente
+        if (chat.isGroup && (chatNameLower.includes("banco") || chatNameLower.includes("respaldo") || chatNameLower.includes("sticker"))) {
             const tag = body.toLowerCase();
             if (msg.type === 'sticker') {
                 try {
@@ -95,58 +108,20 @@ async function ejecutar(client, msg) {
                         if (tag.includes('#amor')) bancoStickers.amor.push(media);
                         else bancoStickers.random.push(media);
                     }
-                } catch (e) { console.log("Error descargando sticker de respaldo."); }
-                return;
-            } 
-            if (msg.type === 'video' || msg.type === 'ptv') {
-                try {
-                    const media = await msg.downloadMedia();
-                    if (media) {
-                        if (tag.includes('#ff')) bancoVideos.ff.push(media);
-                        else if (tag.includes('#dedicar')) bancoVideos.dedicar.push(media);
-                        else if (tag.includes('#fruti')) bancoVideos.fruti.push(media);
-                        else if (tag.includes('#futbol') || tag.includes('#deporte')) bancoVideos.futbol.push(media);
-                        else if (tag.includes('#peliculas')) bancoVideos.peliculas.push(media);
-                        else if (tag.includes('#tiktokfrases')) bancoVideos.tiktokfrases.push(media);
-                        else if (tag.includes('#tiktok')) bancoVideos.tiktok.push(media);
-                        else if (tag.includes('#musica')) bancoVideos.musica.push(media);
-                    }
-                } catch (e) { console.log("Error descargando video de respaldo."); }
-                return;
-            }
-            if (msg.type === 'chat' && body !== "") {
-                let tipo = "";
-                if (tag.includes('#piropo')) tipo = 'piropo';
-                else if (tag.includes('#consejo')) tipo = 'consejo';
-                else if (tag.includes('#motivacion')) tipo = 'motivacion';
-                else if (tag.includes('#fraseamor')) tipo = 'fraseamor';
-
-                if (tipo) {
-                    const limpio = body.replace(new RegExp(`#${tipo}`, 'gi'), '').trim();
-                    const nuevoTexto = new TextoNubeModel({ tipo, contenido: limpio });
-                    await nuevoTexto.save();
-                }
+                } catch (e) { console.log("Error al respaldar sticker."); }
                 return;
             }
         }
 
-        // 🧠 RESPUESTAS AUTOMÁTICAS DINÁMICAS (MENCIONES O PALABRA "BOT")
+        // 🧠 FRASES DE RESPUESTA AUTOMÁTICA DEL BOT
         if (!body.startsWith('.') && !body.toLowerCase().startsWith('aviso')) {
             if (body.toLowerCase().includes('bot') || (msg.mentionedIds && msg.mentionedIds.includes(client.info.wid._serialized))) {
                 const frasesBot = [
-                    `¿Qué pasó, ${username}? Aquí estoy online y listo. Pon *.menu* para ver qué puedo hacer. 😎`,
-                    `¿Me llamaste, crack? Más vale que sean monedas para apostar en mi ruleta... 🎰`,
-                    `Dime, campeón. ¿En qué te asisto hoy? Recuerda que mi comando base es *.menu* 🔥`,
-                    `Presente. Ejecutando procesos al 100% de velocidad con base de datos. ⚡`,
-                    `¿Quién invoca al rey del servidor? Ah, eres tú, ${username}. ¡Hola! 👋`,
-                    `Escuché la palabra 'Bot' y mi sistema se activó automáticamente. ¿Qué hacemos? 💻`,
-                    `A ver, a ver... ¿Quién me necesita? Si buscas diversión, pon *.tragamonedas* ya mismo. 🎰`,
-                    `Aquí estoy, el bot más rápido de Railway. ¿Listo para perder unas monedas en los dados? 🎲`,
-                    `¿Qué onda, ${username}? Recuerda que para usar la Inteligencia Artificial puedes usar *.gemini* 🤖`,
-                    `Modo activo. Si eres administrador, recuerda que tienes comandos de control exclusivos. 🛡️`,
-                    `¿Invocándome otra vez? No te olvides de mandar tu captura de spam al creador para mantener el servicio gratis. 👑`,
-                    `Dime, jugador. ¿Listo para una ronda de *.ruletarusa* o tienes miedo? 🔫`,
-                    `Kori System reportándose sin novedad en el grupo. ¡Un saludo! ✨`
+                    `¿Qué pasó, ${username}? Aquí estoy online y listo. Pon *.menu* para ver mis opciones. 😎`,
+                    `¿Me llamaste, crack? Pon *.menu* para empezar la diversión. 🔥`,
+                    `Presente. Ejecutando procesos al 100% de velocidad estable. ⚡`,
+                    `¿Quién invoca al rey del servidor? Hola, ${username}. 👋`,
+                    `Modo activo. Si eres administrador, recuerda usar los controles grupales. 🛡️`
                 ];
                 return await msg.reply(frasesBot[Math.floor(Math.random() * frasesBot.length)]);
             }
@@ -165,8 +140,7 @@ async function ejecutar(client, msg) {
         }
 
         if (body === '.menu') { command = 'menu'; }
-
-        const gConfig = chat.isGroup ? await getGroupConfig(chat.id._serialized) : null;
+        const gConfig = chat.isGroup ? obtenerGrupoLocal(chat.id._serialized) : null;
 
         let isAdmin = false;
         if (chat.isGroup) {
@@ -175,20 +149,19 @@ async function ejecutar(client, msg) {
         }
 
         if (chat.isGroup && !isAdmin && gConfig?.modoAdmin && command !== 'menu') return;
-
-        switch (command) {
+}
+    switch (command) {
             case 'menu':
                 const uptimeDiff = Math.abs(new Date() - startTime);
                 const hours = Math.floor(uptimeDiff / (1000 * 60 * 60));
                 const minutes = Math.floor((uptimeDiff % (1000 * 60 * 60)) / (1000 * 60));
-                const seconds = Math.floor((uptimeDiff % (1000 * 60)) / 1000);
-
+                
                 const menuTexto = `✨ ╔════════════════════════╗ ✨
        👑  *KORI BOT - EXECUTIVE* ✨ ╚════════════════════════╝ ✨
 
 👤 *Usuario:* \`${username.toUpperCase()}\`
-⏱️ *Uptime:* \`${hours}h ${minutes}m ${seconds}s\`
-🔌 *Database:* \`MongoDB Atlas (Online) 🟢\`
+⏱️ *Uptime:* \`${hours}h ${minutes}m\`
+⚡ *Status:* \`Memoria Local Activa (Estable) 🟢\`
 
 ────────────────────────────
 📊 *STATUS & SISTEMA*
@@ -196,12 +169,11 @@ async function ejecutar(client, msg) {
 📝 ➪ \`.owner\` ── Info del desarrollador oficial
 ⚡ ➪ \`.ping\` ── Verificar latencia del sistema
 🕒 ➪ \`.uptime\` ── Tiempo de actividad continua
-💻 ➪ \`.sistema\` ── Detalles del servidor cloud
 
 🛡️ *ADMINISTRACIÓN & SEGURIDAD*
 ────────────────────────────
 📣 ➪ \`.todos <txt>\` ── Mencionar a todos los miembros
-📢 ➪ \`aviso\` ── Comunicado oficial con imagen/video
+📢 ➪ \`aviso\` ── Comunicado oficial con imagen
 🚷 ➪ \`.kick @user\` ── Remover miembro del grupo
 🚪 ➪ \`.welcome on/off/texto\` ── Mensaje de Bienvenida
 👋 ➪ \`.bye on/off/texto\` ── Mensaje de Despedida
@@ -209,13 +181,9 @@ async function ejecutar(client, msg) {
 📝 ➪ \`.editmsg <texto>\` ── Cambiar info del comando \`.vermsg\`
 📋 ➪ \`.vermsg\` ── Envía los datos fijados del grupo
 
-🤖 *INTELIGENCIA ARTIFICIAL*
+🎰 *MINIJUEGOS & ECONOMÍA LOCAL*
 ────────────────────────────
-🧠 ➪ \`.gemini <texto>\` ── Consulta directa a Gemini 1.5
-
-🎰 *MINIJUEGOS & ECONOMÍA PERSISTENTE*
-────────────────────────────
-📇 ➪ \`.perfil\` ── Ver tu saldo y nivel en la nube
+📇 ➪ \`.perfil\` ── Ver tu saldo y nivel actual
 💰 ➪ \`.trabajar\` ── Trabajar para recolectar dinero
 🎁 ➪ \`.daily\` ── Bono diario de obsequio
 🎲 ➪ \`.ruleta <cant>\` | \`.slot <cant>\` ── Apuestas de azar
@@ -241,23 +209,9 @@ async function ejecutar(client, msg) {
 👑 ➪ \`.rey\` | \`.gay\` | \`.suerte <preg>\` ── Juegos rápidos
 👥 ➪ \`.formarpareja\` ── Casar a dos miembros al azar
 🎨 ➪ \`.s\` ── Generar Sticker desde multimedia
-
-📦 *CONTENIDO MULTIMEDIA NUBE*
-────────────────────────────
 🤡 ➪ \`.stickerazar\` ── Sticker variado aleatorio
 💖 ➪ \`.stickeramor\` ── Sticker romántico interactivo
-🔥 ➪ \`.vff\` ── Videos de Free Fire edits
-🎬 ➪ \`.vdedicar\` ── Videos para dedicar a tu pareja
-🍓 ➪ \`.vfruti\` ── Cortometrajes y Fruti Novelas
-⚽ ➪ \`.vdeporte\` ── Jugadas de fútbol y deportes
-🎥 ➪ \`.vpelicula\` ── Resúmenes de películas
-📱 ➪ \`.vtiktok\` ── Vídeos virales de TikTok
-✍️ ➪ \`.vfrases\` ── Clips motivacionales con texto
-🎵 ➪ \`.vmusica\` ── Tendencias musicales del momento
-❤️ ➪ \`.frasestexto\` ── Frases de amor de MongoDB
-🃏 ➪ \`.piropotexto\` ── Piropos guardados en MongoDB
-💡 ➪ \`.consejotexto\` ── Consejos almacenados en MongoDB
-⚡ ➪ \`.motivacion\` ── Mensajes de superación en MongoDB
+❤️ ➪ \`.frasestexto\` ── Lanza una de las 50 Frases de Amor
 
 🎮 *ÁREA DE CAMPAÑA FREE FIRE*
 ────────────────────────────
@@ -269,22 +223,17 @@ async function ejecutar(client, msg) {
 ────────────────────────────
 👑 *Creador Principal:* DEYVI A.O.C
 📞 *Contacto / WhatsApp:* +51 900834505
-🛠️ *Dudas de soporte:* Si el bot presenta fallas o lentitud, escribe directamente al número oficial adjuntando tu captura.
-
-⚠️ *REMINDER / RECORDATORIO IMPORTANTE:*
-Si estás usando la versión gratuita del bot, recuerda hacer el spam respectivo en tus grupos o redes, tomar captura del apoyo y enviársela de inmediato al creador al número: *51900834505* para mantener tu token activo sin suspensiones. ¡Gracias por el apoyo!
 
 ✨ ─── \`By: DEYVI A.O.C\` ─── ✨`;
-
                 await msg.reply(menuTexto);
                 break;
-                case 'editmsg':
+
+            case 'editmsg':
                 if (!chat.isGroup || !isAdmin) return msg.reply('❌ Comando exclusivo de administradores.');
                 const contenidoMensaje = args.join(' ');
-                if (!contenidoMensaje) return msg.reply('❌ Formato incorrecto. Uso: `.editmsg Aquí va el texto institucional del grupo`');
+                if (!contenidoMensaje) return msg.reply('❌ Formato incorrecto. Uso: `.editmsg Aquí va el texto institucional`');
                 gConfig.msgPersonalizado = contenidoMensaje;
-                await gConfig.save();
-                await msg.reply('✅ *Éxito:* Mensaje personalizado guardado en MongoDB para este grupo.');
+                await msg.reply('✅ Mensaje guardado correctamente en la memoria del grupo.');
                 break;
 
             case 'vermsg':
@@ -293,10 +242,9 @@ Si estás usando la versión gratuita del bot, recuerda hacer el spam respectivo
                 break;
 
             case 'modoadmin':
-                if (!chat.isGroup || !isAdmin) return msg.reply('❌ No tienes los permisos requeridos.');
-                if (args[0] === 'on') { gConfig.modoAdmin = true; await msg.reply('🔒 *MODO ADMIN ACTIVO:* Bot bloqueado para miembros generales.'); }
-                else if (args[0] === 'off') { gConfig.modoAdmin = false; await msg.reply('🔓 *MODO ADMIN INACTIVO:* Acceso libre.'); }
-                await gConfig.save();
+                if (!chat.isGroup || !isAdmin) return msg.reply('❌ No tienes permisos.');
+                if (args[0] === 'on') { gConfig.modoAdmin = true; await msg.reply('🔒 Modo Admin Activo: Solo los admins usan el bot.'); }
+                else if (args[0] === 'off') { gConfig.modoAdmin = false; await msg.reply('🔓 Modo Admin Inactivo: Acceso libre.'); }
                 break;
 
             case 'kick':
@@ -304,8 +252,8 @@ Si estás usando la versión gratuita del bot, recuerda hacer el spam respectivo
                 if (!msg.mentionedIds.length) return msg.reply('❌ Menciona al usuario.');
                 try {
                     for (let target of msg.mentionedIds) { await chat.removeParticipants([target]); }
-                    await msg.reply('🔨 Expulsado.');
-                } catch (e) { await msg.reply('❌ Falta de rango de admin en el bot.'); }
+                    await msg.reply('🔨 Miembro removido.');
+                } catch (e) { await msg.reply('❌ Error: Verifica los rangos del bot.'); }
                 break;
 
             case 'welcome':
@@ -313,7 +261,6 @@ Si estás usando la versión gratuita del bot, recuerda hacer el spam respectivo
                 if (args[0] === 'on') gConfig.welcome = true;
                 else if (args[0] === 'off') gConfig.welcome = false;
                 else if (args[0] === 'texto') gConfig.welcomeText = args.slice(1).join(' ');
-                await gConfig.save();
                 await msg.reply('📝 Estado de bienvenida actualizado.');
                 break;
 
@@ -322,7 +269,6 @@ Si estás usando la versión gratuita del bot, recuerda hacer el spam respectivo
                 if (args[0] === 'on') gConfig.bye = true;
                 else if (args[0] === 'off') gConfig.bye = false;
                 else if (args[0] === 'texto') gConfig.byeText = args.slice(1).join(' ');
-                await gConfig.save();
                 await msg.reply('📝 Estado de despedida actualizado.');
                 break;
 
@@ -351,40 +297,38 @@ Si estás usando la versión gratuita del bot, recuerda hacer el spam respectivo
                 } else { txtAv += args.join(' '); }
                 await chat.sendMessage(txtAv);
                 break;
-                case 'perfil':
-                const perf = await getProfile(userId, username);
-                await msg.reply(`📇 *\`KORI RPG PROFILE\`*\n\n👤 *Nombre:* ${perf.name}\n📈 *Nivel:* ${perf.level}\n💰 *Bolsillo:* $${perf.coins}\n🏦 *Banco:* $${perf.bank}\n💎 *Gemas:* ${perf.gems}\n🛡️ *Seguro:* ${perf.asegurado ? 'ACTIVO ✅' : 'INACTIVO ❌'}`);
+            case 'perfil':
+                const perf = obtenerPerfilLocal(userId, username);
+                await msg.reply(`📇 *\`KORI PROFILE\`*\n\n👤 *Nombre:* ${perf.name}\n📈 *Nivel:* ${perf.level}\n💰 *Bolsillo:* $${perf.coins}\n🏦 *Banco:* $${perf.bank}\n💎 *Gemas:* ${perf.gems}\n🛡️ *Seguro:* ${perf.asegurado ? 'ACTIVO ✅' : 'INACTIVO ❌'}`);
                 break;
 
-            case 'work':
             case 'trabajar':
-                const pW = await getProfile(userId, username);
-                if (Date.now() - pW.lastWork < 300000) return msg.reply('⏳ Estás exhausto. Descansa unos minutos.');
+                const pW = obtenerPerfilLocal(userId, username);
+                if (Date.now() - pW.lastWork < 300000) return msg.reply('⏳ Estás cansado. Descansa unos minutos.');
                 const sueldo = Math.floor(Math.random() * 250) + 150; pW.coins += sueldo; pW.lastWork = Date.now(); pW.asegurado = false;
-                await pW.save(); await msg.reply(`💰 Trabajaste duro y cobraste *$${sueldo} monedas*.`);
+                await msg.reply(`💰 Trabajaste duro y cobraste *$${sueldo} monedas*.`);
                 break;
 
             case 'daily':
-                const pD = await getProfile(userId, username);
+                const pD = obtenerPerfilLocal(userId, username);
                 if (Date.now() - pD.lastDaily < 86400000) return msg.reply('❌ Ya recogiste tu recompensa diaria.');
                 pD.coins += 1000; pD.lastDaily = Date.now(); pD.asegurado = false;
-                await pD.save(); await msg.reply('🎁 *DIARIO:* Sumaste *$1,000 monedas* a tu balance.');
+                await msg.reply('🎁 *DIARIO:* Sumaste *$1,000 monedas* a tu balance.');
                 break;
 
             case 'ruleta':
             case 'slot':
-                const pRul = await getProfile(userId, username);
+                const pRul = obtenerPerfilLocal(userId, username);
                 if (!args.length || isNaN(args[0])) return msg.reply('❌ Digita un valor numérico.');
                 const ap = parseInt(args[0]);
-                if (pRul.coins < ap || ap <= 0) return msg.reply('❌ Fondos insuficientes en bolsillo.');
+                if (pRul.coins < ap || ap <= 0) return msg.reply('❌ Fondos insuficientes.');
                 pRul.asegurado = false;
                 if (Math.random() >= 0.5) { pRul.coins += ap; await msg.reply(`🎰 *¡GANASTE!:* Duplicaste la apuesta. +$${ap}.`); } 
-                else { pRul.coins -= ap; await msg.reply(`🎰 *PERDISTE:* La casa se queda con tu dinero. -$${ap}.`); }
-                await pRul.save();
+                else { pRul.coins -= ap; await msg.reply(`🎰 *PERDISTE:* La casa gana. -$${ap}.`); }
                 break;
 
             case 'tragamonedas':
-                const pSlot = await getProfile(userId, username);
+                const pSlot = obtenerPerfilLocal(userId, username);
                 if (!args.length || isNaN(args[0])) return msg.reply('❌ Digita el monto.');
                 const bS = parseInt(args[0]);
                 if (bS <= 0 || pSlot.coins < bS) return msg.reply('❌ Monedas insuficientes.');
@@ -396,36 +340,36 @@ Si estás usando la versión gratuita del bot, recuerda hacer el spam respectivo
                 if (r1 === r2 && r2 === r3) { pSlot.coins += bS * 4; resS += `🎉 *JACKPOT TRIPLE!* Recibes *$${bS * 4}*!`; }
                 else if (r1 === r2 || r2 === r3 || r1 === r3) { pSlot.coins += Math.floor(bS * 1.5); resS += `✨ *¡Suerte Par!* Recibes *$${Math.floor(bS * 1.5)}*.`; }
                 else { pSlot.coins -= bS; resS += `📉 *Perdiste.* -$${bS}.`; }
-                await pSlot.save(); await msg.reply(resS);
+                await msg.reply(resS);
                 break;
 
             case 'ruletarusa':
                 if (Math.floor(Math.random() * 6) === 0) {
                     await msg.reply('💥 *¡PUMMMMMM!* Bala en la recámara. Has muerto. 💀');
                     if (chat.isGroup && !isAdmin) { try { await chat.removeParticipants([userId]); } catch (e) {} }
-                } else { await msg.reply('🛡️ *¡CLIC!* Tambor vacío. Sobreviviste un turno.'); }
+                } else { await msg.reply('🛡️ *¡CLIC!* Tambor vacío. Sobreviviste.'); }
                 break;
 
             case 'robar':
                 if (!chat.isGroup || !msg.mentionedIds.length) return msg.reply('❌ Menciona a tu objetivo.');
-                const ladron = await getProfile(userId, username); const vId = msg.mentionedIds[0];
+                const ladron = obtenerPerfilLocal(userId, username); const vId = msg.mentionedIds[0];
                 if (userId === vId) return msg.reply('🧠 Acción inválida.');
-                const vCont = await client.getContactById(vId); const victima = await getProfile(vId, vCont.pushname);
+                const vCont = await client.getContactById(vId); const victima = obtenerPerfilLocal(vId, vCont.pushname);
                 if (victima.coins <= 50) return msg.reply('❌ El objetivo no tiene capital.');
-                if (victima.asegurado) { victima.asegurado = false; ladron.coins = Math.max(0, ladron.coins - 100); await victima.save(); await ladron.save(); return await chat.sendMessage(`🚨 *ALERTA:* @${sender.id.user} rebotó contra el escudo de @${vCont.id.user}. Penalización de $100.`, { mentions: [sender, vCont] }); }
-                if (Math.random() >= 0.5) { const rob = Math.floor(Math.random() * (victima.coins * 0.3)) + 20; victima.coins -= rob; ladron.coins += rob; await victima.save(); await ladron.save(); await chat.sendMessage(`🦹‍♂️ *ÉXITO:* @${sender.id.user} extrajo *$${rob}* de las pertenencias de @${vCont.id.user}.`, { mentions: [sender, vCont] }); }
-                else { ladron.coins = Math.max(0, ladron.coins - 80); await ladron.save(); await chat.sendMessage(`👮‍♂️ *FALLO:* Capturado en flagrancia. Multa judicial de $80 para @${sender.id.user}.`, { mentions: [sender] }); }
+                if (victima.asegurado) { victima.asegurado = false; ladron.coins = Math.max(0, ladron.coins - 100); return await chat.sendMessage(`🚨 *ALERTA:* @${sender.id.user} rebotó contra el escudo de @${vCont.id.user}. Penalización de $100.`, { mentions: [sender, vCont] }); }
+                if (Math.random() >= 0.5) { const rob = Math.floor(Math.random() * (victima.coins * 0.3)) + 20; victima.coins -= rob; ladron.coins += rob; await chat.sendMessage(`🦹‍♂️ *ÉXITO:* @${sender.id.user} extrajo *$${rob}* a @${vCont.id.user}.`, { mentions: [sender, vCont] }); }
+                else { ladron.coins = Math.max(0, ladron.coins - 80); await chat.sendMessage(`👮‍♂️ *FALLO:* Multa aplicada de $80 para @${sender.id.user}.`, { mentions: [sender] }); }
                 break;
 
             case 'asegurar':
-                const uAs = await getProfile(userId, username);
+                const uAs = obtenerPerfilLocal(userId, username);
                 if (uAs.coins < 50) return msg.reply('❌ Requieres $50 monedas.');
-                uAs.coins -= 50; uAs.asegurado = true; await uAs.save();
-                await msg.reply('🛡️ *SISTEMA:* Seguro anti-robos deployed en tu cuenta.');
+                uAs.coins -= 50; uAs.asegurado = true;
+                await msg.reply('🛡️ Seguro anti-robos activo.');
                 break;
 
             case 'blackjack':
-                const pBj = await getProfile(userId, username);
+                const pBj = obtenerPerfilLocal(userId, username);
                 if (!args.length || isNaN(args[0])) return msg.reply('❌ Digita el valor.');
                 const aB = parseInt(args[0]);
                 if (pBj.coins < aB || aB <= 0) return msg.reply('❌ Saldo insuficiente.');
@@ -433,142 +377,113 @@ Si estás usando la versión gratuita del bot, recuerda hacer el spam respectivo
                 if (tP > 21) { pBj.coins -= aB; await msg.reply(`🃏 Te excediste con \`${tP}\`. Perdiste *$${aB}*.`); }
                 else if (bP > 21 || tP > bP) { pBj.coins += aB; await msg.reply(`🃏 ¡Victoria! Lograste \`${tP}\` contra \`${bP}\` del crupier. +$${aB}.`); }
                 else { pBj.coins -= aB; await msg.reply(`🃏 Derrota. El crupier plantó \`${bP}\` frente a tu \`${tP}\`. -$${aB}.`); }
-                await pBj.save();
                 break;
 
             case 'dados':
-                const pDd = await getProfile(userId, username);
+                const pDd = obtenerPerfilLocal(userId, username);
                 if (!args.length || isNaN(args[0])) return msg.reply('❌ Digita la apuesta.');
                 const aD = parseInt(args[0]);
                 if (pDd.coins < aD || aD <= 0) return msg.reply('❌ Balance insuficiente.');
                 const dU = Math.floor(Math.random() * 6) + 1; const dB = Math.floor(Math.random() * 6) + 1;
-                if (dU > dB) { pDd.coins += aD; await msg.reply(`🎲 Obtuviste \`${dU}\` vs \`${dB}\` del sistema. ¡Ganaste *$${aD}*!`); }
-                else if (dU < dB) { pDd.coins -= aD; await msg.reply(`🎲 Obtuviste \`${dU}\` vs \`${dB}\` del sistema. ¡Perdiste *$${aD}*!`); }
+                if (dU > dB) { pDd.coins += aD; await msg.reply(`🎲 Obtuviste \`${dU}\` vs \`${dB}\`. ¡Ganaste *$${aD}*!`); }
+                else if (dU < dB) { pDd.coins -= aD; await msg.reply(`🎲 Obtuviste \`${dU}\` vs \`${dB}\`. ¡Perdiste *$${aD}*!`); }
                 else { await msg.reply(`🎲 Empate técnico a \`${dU}\`. Fondos devueltos.`); }
-                await pDd.save();
                 break;
 
             case 'desafio':
                 if (!chat.isGroup || !msg.mentionedIds.length || !args[1] || isNaN(args[1])) return msg.reply('❌ Parámetros inválidos. Uso: `.desafio @user 100`');
-                const d1 = await getProfile(userId, username); const d2Id = msg.mentionedIds[0];
+                const d1 = obtenerPerfilLocal(userId, username); const d2Id = msg.mentionedIds[0];
                 if (userId === d2Id) return msg.reply('❌ Autodesafío no permitido.');
-                const cD2 = await client.getContactById(d2Id); const d2 = await getProfile(d2Id, cD2.pushname);
+                const cD2 = await client.getContactById(d2Id); const d2 = obtenerPerfilLocal(d2Id, cD2.pushname);
                 const pz = parseInt(args[1]);
-                if (d1.coins < pz || d2.coins < pz || pz <= 0) return msg.reply('❌ Fondos insuficientes en alguna de las dos cuentas.');
-                if (Math.random() >= 0.5) { d1.coins += pz; d2.coins -= pz; await chat.sendMessage(`⚔️ @${sender.id.user} pulverizó en duelo a @${cD2.id.user} llevándose *$${pz}*.`, { mentions: [sender, cD2] }); }
-                else { d2.coins += pz; d1.coins -= pz; await chat.sendMessage(`⚔️ @${cD2.id.user} dominó el encuentro y cobró *$${pz}* de @${sender.id.user}.`, { mentions: [sender, cD2] }); }
-                await d1.save(); await d2.save();
+                if (d1.coins < pz || d2.coins < pz || pz <= 0) return msg.reply('❌ Fondos insuficientes en alguna de las cuentas.');
+                if (Math.random() >= 0.5) { d1.coins += pz; d2.coins -= pz; await chat.sendMessage(`⚔️ @${sender.id.user} ganó el duelo a @${cD2.id.user} llevándose *$${pz}*.`, { mentions: [sender, cD2] }); }
+                else { d2.coins += pz; d1.coins -= pz; await chat.sendMessage(`⚔️ @${cD2.id.user} ganó el encuentro y cobró *$${pz}* de @${sender.id.user}.`, { mentions: [sender, cD2] }); }
                 break;
 
             case 'minar':
-                const pM = await getProfile(userId, username);
-                if (Date.now() - pM.lastMinar < 600000) return msg.reply('⏳ Herramientas sobrecalentadas. Espera un momento.');
+                const pM = obtenerPerfilLocal(userId, username);
+                if (Date.now() - pM.lastMinar < 600000) return msg.reply('⏳ Herramientas calientes. Espera un momento.');
                 pM.lastMinar = Date.now();
-                if (Math.random() >= 0.7) { pM.gems += 2; await msg.reply('⛏️💎 ¡Excelente yacimiento! Extrajiste **2 Gemas Preciosas**.'); }
-                else { const min = Math.floor(Math.random() * 300) + 100; pM.coins += min; await msg.reply(`⛏️ Carbón y oro recolectados. Valor de venta: +$${min}.`); }
-                await pM.save();
+                if (Math.random() >= 0.7) { pM.gems += 2; await msg.reply('⛏️💎 ¡Excelente! Extrajiste **2 Gemas Preciosas**.'); }
+                else { const min = Math.floor(Math.random() * 300) + 100; pM.coins += min; await msg.reply(`⛏️ Oro recolectado. Valor de venta: +$${min}.`); }
                 break;
 
             case 'crimen':
-                const pCr = await getProfile(userId, username);
-                if (Date.now() - pCr.lastCrimen < 900000) return msg.reply('🕵️‍♂️ Operación bajo vigilancia federal. Espera.');
+                const pCr = obtenerPerfilLocal(userId, username);
+                if (Date.now() - pCr.lastCrimen < 900000) return msg.reply('🕵️‍♂️ Operación bajo vigilancia. Espera.');
                 pCr.lastCrimen = Date.now();
-                if (Math.random() >= 0.6) { const gp = Math.floor(Math.random() * 800) + 400; pCr.coins += gp; await msg.reply(`🦹‍♂️💰 Éxito criminal de alto calibre. Utilidad neta: *$${gp}*.`); }
-                else { pCr.coins = Math.max(0, pCr.coins - 200); await msg.reply('🚓🚨 Interceptado por fuerzas especiales. Multa de fianza aplicada: *$200*.'); }
-                await pCr.save();
+                if (Math.random() >= 0.6) { const gp = Math.floor(Math.random() * 800) + 400; pCr.coins += gp; await msg.reply(`🦹‍♂️💰 Éxito criminal. Utilidad neta: *$${gp}*.`); }
+                else { pCr.coins = Math.max(0, pCr.coins - 200); await msg.reply('🚓 Interceptado por la policía. Multa aplicada: *$200*.'); }
                 break;
 
             case 'invertir':
-                const pIv = await getProfile(userId, username);
-                if (!args.length || isNaN(args[0])) return msg.reply('❌ Digita el capital a colocar.');
+                const pIv = obtenerPerfilLocal(userId, username);
+                if (!args.length || isNaN(args[0])) return msg.reply('❌ Digita el capital.');
                 const cIv = parseInt(args[0]);
-                if (pIv.coins < cIv || cIv <= 0) return msg.reply('❌ Saldo insatisfactorio.');
-                if (Math.random() >= 0.45) { const rI = Math.floor(cIv * 2.2); pIv.coins += rI; await msg.reply(`📈 Gráficos en verde. Retorno corporativo del +120%: +$${rI}.`); }
-                else { pIv.coins -= cIv; await msg.reply(`📉 Liquidez absorbida por mercado bajista. Pérdida completa de *$${cIv}*.`); }
-                await pIv.save();
+                if (pIv.coins < cIv || cIv <= 0) return msg.reply('❌ Saldo insuficiente.');
+                if (Math.random() >= 0.45) { const rI = Math.floor(cIv * 2.2); pIv.coins += rI; await msg.reply(`📈 Mercado en verde. Retorno del +120%: +$${rI}.`); }
+                else { pIv.coins -= cIv; await msg.reply(`📉 Mercado bajista. Pérdida completa de *$${cIv}*.`); }
                 break;
 
             case 'cofre':
                 if (!isAdmin) return;
                 cofreActivo.activo = true; cofreActivo.monedas = Math.floor(Math.random() * 1500) + 500;
-                await chat.sendMessage('📦🎁 *¡COFRE EXCLUSIVO DROP EN EL GRUPO!* 🎁📦\nColoca de inmediato el comando *.abricofre* para reclamar el contenido.');
+                await chat.sendMessage('📦🎁 *¡COFRE EXCLUSIVO DROP EN EL GRUPO!* 🎁📦\nColoca de inmediato el comando *.abricofre* para reclamarlo.');
                 break;
 
             case 'abricofre':
-                if (!cofreActivo.activo) return msg.reply('❌ El entorno no registra cofres disponibles.');
-                const pCf = await getProfile(userId, username); pCf.coins += cofreActivo.monedas; await pCf.save();
-                await chat.sendMessage(`🎉🥳 @${sender.id.user} descifró el cofre y se adjudicó *$${cofreActivo.monedas}* monedas libres!`, { mentions: [sender] });
+                if (!cofreActivo.activo) return msg.reply('❌ No hay cofres disponibles.');
+                const pCf = obtenerPerfilLocal(userId, username); pCf.coins += cofreActivo.monedas;
+                await chat.sendMessage(`🎉🥳 @${sender.id.user} abrió el cofre y ganó *$${cofreActivo.monedas}* monedas!`, { mentions: [sender] });
                 cofreActivo.activo = false;
                 break;
 
             case 'ppt':
-                const pPp = await getProfile(userId, username);
-                if (!args[0] || isNaN(args[0]) || !args[1]) return msg.reply('❌ Estructura errónea: `.ppt 50 piedra`');
+                const pPp = obtenerPerfilLocal(userId, username);
+                if (!args[0] || isNaN(args[0]) || !args[1]) return msg.reply('❌ Formato: `.ppt 50 piedra`');
                 const aP = parseInt(args[0]); const jU = args[1].toLowerCase();
                 if (pPp.coins < aP || aP <= 0) return msg.reply('❌ Saldo insuficiente.');
                 if (!['piedra', 'papel', 'tijera'].includes(jU)) return msg.reply('❌ Elige piedra, papel o tijera.');
                 const ops = ['piedra', 'papel', 'tijera']; const jB = ops[Math.floor(Math.random() * 3)];
-                let rP = `🎮 Elección: \`${jU}\` | Kori Bot: \`${jB}\`\n`;
-                if (jU === jB) { await msg.reply(rP + '👔 Declarado un empate sin variaciones.'); }
-                else if ((jU==='piedra'&&jB==='tijera') || (jU==='papel'&&jB==='piedra') || (jU==='tijera'&&jB==='papel')) { pPp.coins += aP; await msg.reply(rP + `🏆 Victoria contundente. Recibes *$${aP}*.`); }
-                else { pPp.coins -= aP; await msg.reply(rP + `📉 Derrota frente al algoritmo. Pierdes *$${aP}*.`); }
-                await pPp.save();
+                let rP = `🎮 Elección: \`${jU}\` | Bot: \`${jB}\`\n`;
+                if (jU === jB) { await msg.reply(rP + '👔 Empate técnico.'); }
+                else if ((jU==='piedra'&&jB==='tijera') || (jU==='papel'&&jB==='piedra') || (jU==='tijera'&&jB==='papel')) { pPp.coins += aP; await msg.reply(rP + `🏆 Ganaste *$${aP}*.`); }
+                else { pPp.coins -= aP; await msg.reply(rP + `📉 Perdiste *$${aP}*.`); }
                 break;
 
             case 'pelear':
-                if (!chat.isGroup || !msg.mentionedIds.length) return msg.reply('❌ Estipula tu contrincante.');
-                const rtd = await getProfile(userId, username); const rvId = msg.mentionedIds[0];
+                if (!chat.isGroup || !msg.mentionedIds.length) return msg.reply('❌ Menciona a tu oponente.');
+                const rtd = obtenerPerfilLocal(userId, username); const rvId = msg.mentionedIds[0];
                 if (userId === rvId) return;
-                const rvC = await client.getContactById(rvId); const rvl = await getProfile(rvId, rvC.pushname);
+                const rvC = await client.getContactById(rvId); const rvl = obtenerPerfilLocal(rvId, rvC.pushname);
                 const bt = Math.floor(Math.random() * 100) + 50;
-                await msg.reply(`🥊 Intercambio de golpes iniciado entre @${sender.id.user} y @${rvC.id.user}...`);
+                await msg.reply(`🥊 ¡Pelea iniciada entre @${sender.id.user} y @${rvC.id.user}...`);
                 setTimeout(async () => {
-                    if (Math.random() >= 0.5) { rtd.coins += bt; rvl.coins = Math.max(0, rvl.coins - bt); await chat.sendMessage(`🏆 @${sender.id.user} noqueó a su oponente. Recompensa: +$${bt}.`, { mentions: [sender, rvC] }); }
-                    else { rvl.coins += bt; rtd.coins = Math.max(0, rtd.coins - bt); await chat.sendMessage(`🏆 @${rvC.id.user} dominó la lona. Recompensa: +$${bt}.`, { mentions: [sender, rvC] }); }
-                    await rtd.save(); await rvl.save();
+                    if (Math.random() >= 0.5) { rtd.coins += bt; rvl.coins = Math.max(0, rvl.coins - bt); await chat.sendMessage(`🏆 @${sender.id.user} noqueó a su oponente. +$${bt}.`, { mentions: [sender, rvC] }); }
+                    else { rvl.coins += bt; rtd.coins = Math.max(0, rtd.coins - bt); await chat.sendMessage(`🏆 @${rvC.id.user} ganó la pelea. +$${bt}.`, { mentions: [sender, rvC] }); }
                 }, 1500);
                 break;
-                case 'frasestexto':
-            case 'piropotexto':
-            case 'consejotexto':
-            case 'motivacion':
-                const tp = command === 'frasestexto' ? 'fraseamor' : command === 'piropotexto' ? 'piropo' : command === 'consejotexto' ? 'consejo' : 'motivacion';
-                const textosGuardados = await TextoNubeModel.find({ tipo: tp });
-                if (!textosGuardados || textosGuardados.length === 0) return msg.reply(`📦 Base de datos remota sin registros para el tag #${tp}.`);
-                const elegido = textosGuardados[Math.floor(Math.random() * textosGuardados.length)].contenido;
-                await msg.reply(elegido);
+
+            case 'frasestexto':
+                const fraseElegida = listaFrasesAmor[Math.floor(Math.random() * listaFrasesAmor.length)];
+                await msg.reply(fraseElegida);
                 break;
 
             case 'stickerazar':
-                if (bancoStickers.random.length === 0) return msg.reply('📦 Memoria intermedia vacía. Envía stickers al grupo de respaldo.');
+                if (bancoStickers.random.length === 0) return msg.reply('📦 El banco de respaldo está vacío por ahora. Envía stickers al grupo de respaldo.');
                 await chat.sendMessage(bancoStickers.random[Math.floor(Math.random() * bancoStickers.random.length)], { sendMediaAsSticker: true });
                 break;
 
             case 'stickeramor':
-                if (bancoStickers.amor.length === 0) return msg.reply('📦 El almacén temporal no registra stickers de amor.');
-                await msg.reply('⚙️ *Kori Analizador:* Procesando cálculo de compatibilidad amorosa... ⏱️');
-                setTimeout(async () => {
-                    await chat.sendMessage(bancoStickers.amor[Math.floor(Math.random() * bancoStickers.amor.length)], { sendMediaAsSticker: true });
-                }, 1200);
-                break;
-
-            case 'vff':
-            case 'vdedicar':
-            case 'vfruti':
-            case 'vdeporte':
-            case 'vpelicula':
-            case 'vtiktok':
-            case 'vfrases':
-            case 'vmusica':
-                const ct = command === 'vff' ? 'ff' : command === 'vdedicar' ? 'dedicar' : command === 'vfruti' ? 'fruti' : command === 'vdeporte' ? 'futbol' : command === 'vpelicula' ? 'peliculas' : command === 'vtiktok' ? 'tiktok' : command === 'vfrases' ? 'tiktokfrases' : 'musica';
-                if (bancoVideos[ct].length === 0) return msg.reply(`📦 Error: No hay videos cargados en la caché para el tag #${ct}.`);
-                await chat.sendMessage(bancoVideos[ct][Math.floor(Math.random() * bancoVideos[ct].length)]);
+                if (bancoStickers.amor.length === 0) return msg.reply('📦 El banco temporal no registra stickers con el tag #amor.');
+                await chat.sendMessage(bancoStickers.amor[Math.floor(Math.random() * bancoStickers.amor.length)], { sendMediaAsSticker: true });
                 break;
 
             case 'chapar':
                 if (!chat.isGroup || !msg.mentionedIds.length) return;
                 const bC = await client.getContactById(msg.mentionedIds[0]);
-                await chat.sendMessage(`💋 @${sender.id.user} le otorgó un beso apasionado en los labios a @${bC.id.user}. 🔥💕`, { mentions: [sender, bC] });
+                await chat.sendMessage(`💋 @${sender.id.user} le dio un beso apasionado a @${bC.id.user}. 🔥💕`, { mentions: [sender, bC] });
                 break;
 
             case 'matar':
@@ -585,7 +500,7 @@ Si estás usando la versión gratuita del bot, recuerda hacer el spam respectivo
                     let u2 = mbs[Math.floor(Math.random() * mbs.length)].id.user;
                     while (u1 === u2) u2 = mbs[Math.floor(Math.random() * mbs.length)].id.user;
                     const c1 = await client.getContactById(u1 + '@c.us'); const c2 = await client.getContactById(u2 + '@c.us');
-                    await chat.sendMessage(`💘 *ALGORITMO CUPIDO:* @${u1} x @${u2} ── \`100% Compatibles\` 😍`, { mentions: [c1, c2] });
+                    await chat.sendMessage(`💘 *CUPIDO:* @${u1} x @${u2} ── \`100% Compatibles\` 😍`, { mentions: [c1, c2] });
                 } else {
                     const oC = await client.getContactById(msg.mentionedIds[0]); const pr = Math.floor(Math.random() * 100) + 1;
                     await chat.sendMessage(`💕 *COMPATIBILIDAD:* @${sender.id.user} x @${oC.id.user} ── \`${pr}%\` 🔥`, { mentions: [sender, oC] });
@@ -595,37 +510,19 @@ Si estás usando la versión gratuita del bot, recuerda hacer el spam respectivo
             case 'rey':
                 const ry = chat.participants[Math.floor(Math.random() * chat.participants.length)].id.user;
                 const cRy = await client.getContactById(ry + '@c.us');
-                await chat.sendMessage(`👑 *DECRETO:* Postrémonos ante el auténtico Rey del servidor: @${ry} ✨`, { mentions: [cRy] });
+                await chat.sendMessage(`👑 *DECRETO:* Saludemos al Rey del grupo: @${ry} ✨`, { mentions: [cRy] });
                 break;
 
             case 'gay':
                 const gy = chat.participants[Math.floor(Math.random() * chat.participants.length)].id.user;
                 const cGy = await client.getContactById(gy + '@c.us');
-                await chat.sendMessage(`🌈 *SCANNER:* @${gy} registra niveles del \`${Math.floor(Math.random() * 100) + 1}%\`. 💅`, { mentions: [cGy] });
+                await chat.sendMessage(`🌈 *SCANNER:* @${gy} registra un nivel del \`${Math.floor(Math.random() * 100) + 1}%\` 💅`, { mentions: [cGy] });
                 break;
 
             case 'suerte':
-                if (!args.length) return msg.reply('❌ Añade la interrogante.');
-                const rps = ["🔮 Concedido. Es una realidad absoluta. ✅", "🔮 Las variables matemáticas arrojan un no rotundo. ❌", "🔮 Fluctuaciones detectadas. Inténtalo de nuevo. 🌀"];
+                if (!args.length) return msg.reply('❌ Añade tu pregunta.');
+                const rps = ["🔮 Absolutamente Sí. ✅", "🔮 Las probabilidades dicen que No. ❌", "🔮 El destino es incierto, intenta de nuevo. 🌀"];
                 await msg.reply(rps[Math.floor(Math.random() * rps.length)]);
-                break;
-
-            case 'n':
-            case 'reenviar':
-                if (msg.hasQuotedMsg) {
-                    const q = await msg.getQuotedMessage();
-                    if (q.hasMedia) await chat.sendMessage(await q.downloadMedia(), { caption: q.body || '' }); 
-                    else await chat.sendMessage(q.body);
-                }
-                break;
-
-            case 'gemini':
-                if (!args.length || !aiModel) return msg.reply('❌ Ingresa una consulta válida.');
-                try {
-                    await msg.reply('🧠 *KORI SYSTEM IA* procesando datos...');
-                    const result = await aiModel.generateContent(args.join(' '));
-                    await msg.reply(`🤖 *Gemini Core:* \n\n${(await result.response).text()}`);
-                } catch (err) { await msg.reply('❌ Inconvenientes con la API de IA.'); }
                 break;
 
             case 'owner':
@@ -636,31 +533,29 @@ Si estás usando la versión gratuita del bot, recuerda hacer el spam respectivo
             case '12vs12':
             case 'sala':
             case 'uptime':
-            case 'sistema':
             case 'ping':
             case 's':
             case 'sticker':
-                if (command === 'owner' || command === 'creador') await msg.reply(`👤 *Líder de Proyecto:* DEYVI A.O.C\n📞 *Línea Comercial / Soporte:* +51 900834505\n💻 *Cloud Server:* Node.js 22 & MongoDB Atlas.`);
-                if (['4vs4','6vs6','8vs8','12vs12'].includes(command)) await msg.reply(`🎮 *CAMPAMENTO FF:* @everyone ¡Escuadra requerida para confrontamiento *${command.toUpperCase()}*! Coordinar IDs.`);
-                if (command === 'sala') await msg.reply('🔑 *SALA DE COMPETENCIA:* Preparando parámetros base...');
-                if (command === 'uptime') await msg.reply(`⏱️ *Línea de tiempo continua:* ${Math.floor(Math.abs(new Date() - startTime) / (1000 * 60 * 60))} horas.`);
-                if (command === 'sistema') await msg.reply(`🖥️ *Core:* Linux Nube | Mongoose v8 | Arquitectura Anti-Crash.`);
-                if (command === 'ping') await msg.reply('🚀 *Latency Test:* Pong! Estabilidad completa del canal de red.');
+                if (command === 'owner' || command === 'creador') await msg.reply(`👤 *Líder de Proyecto:* DEYVI A.O.C\n📞 *Contacto Oficial:* +51 900834505`);
+                if (['4vs4','6vs6','8vs8','12vs12'].includes(command)) await msg.reply(`🎮 *CAMPAMENTO FF:* @everyone ¡Se busca escuadra para versus *${command.toUpperCase()}*!`);
+                if (command === 'sala') await msg.reply('🔑 *SALA DE COMPETENCIA:* Armando los parámetros bases...');
+                if (command === 'uptime') await msg.reply(`⏱️ *Tiempo activo:* ${Math.floor(Math.abs(new Date() - startTime) / (1000 * 60 * 60))} horas.`);
+                if (command === 'ping') await msg.reply('🚀 *Latency Test:* ¡Pong! Conexión limpia y estable.');
                 if (command === 's' || command === 'sticker') {
                     if (msg.hasMedia || (msg.hasQuotedMsg && (await msg.getQuotedMessage()).hasMedia)) {
                         try {
                             const m = msg.hasMedia ? msg : await msg.getQuotedMessage();
                             const media = await m.downloadMedia();
                             if (media) await chat.sendMessage(media, { sendMediaAsSticker: true, stickerName: "KORI EXECUTIVE 🤖", stickerAuthor: "DEYVI A.O.C ✨" });
-                        } catch (e) { await msg.reply('❌ Error de renderizado.'); }
-                    } else { await msg.reply('❌ Adjunta o responde a un elemento multimedia.'); }
+                        } catch (e) { await msg.reply('❌ Error al renderizar.'); }
+                    } else { await msg.reply('❌ Responde a una imagen o video corto.'); }
                 }
                 break;
 
             default:
                 break;
         }
-    } catch (error) { console.log('Error interceptado por el núcleo:', error); }
+    } catch (error) { console.log('Error interceptado:', error); }
 }
 
 function vincularEventosEspeciales(client) {
@@ -668,7 +563,7 @@ function vincularEventosEspeciales(client) {
         try {
             const chat = await notification.getChat();
             const contact = await client.getContactById(notification.recipientIds[0]);
-            const config = await GrupoModel.findOne({ groupId: chat.id._serialized });
+            const config = obtenerGrupoLocal(chat.id._serialized);
             if (config && config.welcome) {
                 let mF = config.welcomeText.replace('@user', `@${contact.id.user}`);
                 let fM; try { const url = await client.getProfilePicUrl(contact.id._serialized); if (url) fM = await MessageMedia.fromUrl(url); } catch (err) {}
@@ -683,7 +578,7 @@ function vincularEventosEspeciales(client) {
         try {
             const chat = await notification.getChat();
             const contact = await client.getContactById(notification.recipientIds[0]);
-            const config = await GrupoModel.findOne({ groupId: chat.id._serialized });
+            const config = obtenerGrupoLocal(chat.id._serialized);
             if (config && config.bye) {
                 let mF = config.byeText.replace('@user', `@${contact.id.user}`);
                 const fD = await MessageMedia.fromUrl("https://i.postimg.cc/gJ0pM9qf/bye-image.jpg").catch(() => null);
