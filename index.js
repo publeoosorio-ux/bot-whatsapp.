@@ -10,8 +10,18 @@ http.createServer((req, res) => {
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
+const mongoose = require('mongoose'); // 🔌 NUEVO: Motor de base de datos integrado
 const comandos = require('./comandos.js');
 
+// 🔌 CONEXIÓN PERMANENTE CON MONGODB ATLAS
+// Reemplaza esto con tu URL de conexión real que obtuviste de tu cluster de MongoDB Atlas.
+const MONGO_URI = process.env.MONGO_URI || "TU_URL_DE_CONEXION_DE_MONGODB_ATLAS";
+
+mongoose.connect(MONGO_URI)
+    .then(() => console.log("🔌 Conectado con éxito a MongoDB Atlas (Base de datos blindada) 🟢"))
+    .catch(err => console.error("❌ Error crítico de infraestructura al conectar a MongoDB:", err));
+
+// Configuración avanzada de Puppeteer optimizada para entornos Linux Cloud (Railway)
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
@@ -39,10 +49,11 @@ client.on('qr', (qr) => {
 });
 
 client.on('ready', () => {
-    console.log('¡El Bot está completamente en línea y respondiendo!');
+    console.log('🚀 KORI BOT MULTI-DEVICE EN LÍNEA Y TOTALMENTE OPERATIVO 🚀');
 });
 
-client.on('message_create', async msg => {
+// Captura y procesa todos los mensajes entrantes y salientes (Sincronización total)
+client.on('message_create', async (msg) => {
     await comandos.ejecutar(client, msg);
 });
 
