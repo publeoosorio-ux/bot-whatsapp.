@@ -58,7 +58,7 @@ async function ejecutar(client, msg) {
         const username = sender.pushname || 'Usuario';
 
         // Procesador Automático para capturar stickers, videos y textos en tus grupos de respaldo
-        if (chat.isGroup && (chat.name.includes("Banco") || chat.name.includes("Respaldo"))) {
+        if (chat.isGroup && (chat.name.toLowerCase().includes("banco") || chat.name.toLowerCase().includes("respaldo"))) {
             const tag = body.toLowerCase();
             if (msg.hasMedia) {
                 const mediaType = msg.type;
